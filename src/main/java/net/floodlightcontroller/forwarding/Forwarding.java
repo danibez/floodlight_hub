@@ -26,6 +26,7 @@ import net.floodlightcontroller.core.IFloodlightProviderService;
 import net.floodlightcontroller.core.IOFSwitch;
 import net.floodlightcontroller.core.IOFSwitchListener;
 import net.floodlightcontroller.core.PortChangeType;
+import net.floodlightcontroller.core.IListener.Command;
 import net.floodlightcontroller.core.internal.IOFSwitchService;
 import net.floodlightcontroller.core.module.FloodlightModuleContext;
 import net.floodlightcontroller.core.module.FloodlightModuleException;
@@ -614,11 +615,31 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
         if (isBroadcastOrMulticast(eth)) {
             doFlood(sw, pi, decision, cntx);
         } else {
-            doL2ForwardFlow(sw, pi, decision, cntx, false);
+        	IPacket pkt = eth.getPayload();
+        	if (pkt instanceof IPv4)
+        	{
+        		IPv4 ipv4 = (IPv4) eth.getPayload();
+        		if (ipv4.getProtocol() == IpProtocol.TCP) {
+		        	TCP tcp = (TCP) ipv4.getPayload();
+		        	if((tcp.getDestinationPort().toString().compareTo("5001") != 0) && (tcp.getSourcePort().toString().compareTo("5001") != 0))
+		        	{
+		        		pi = analyzePacketIn();
+//		        		doL2ForwardFlow(sw, pi, decision, cntx, false);
+		        	}
+        		}
+//        		else
+//            		doL2ForwardFlow(sw, pi, decision, cntx, false);
+        	}
+//        	else
+        	doL2ForwardFlow(sw, pi, decision, cntx, false);
         }
     }
 
-    /**
+    private OFPacketIn analyzePacketIn() {
+		return null;		
+	}
+
+	/**
      * This function retrieves a patch from source device to destination device and then install L2 flows over the path.
      *
      * @param sw The switch on which the packet was received
@@ -696,7 +717,7 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
             log.debug("Both source and destination are on the same switch/port {}/{}. Dropping packet", sw.toString(), srcPort);
             return;
         }
-
+        
         U64 flowSetId = flowSetIdRegistry.generateFlowSetId();
         U64 cookie = makeForwardingCookie(decision, flowSetId);
         Path path = routingEngineService.getPath(srcSw,

@@ -219,99 +219,101 @@ public class Hub extends ForwardingBase implements IFloodlightModule, IOFMessage
     	switch (msg.getType()) {
 	    	case PACKET_IN:
 	            Ethernet eth = IFloodlightProviderService.bcStore.get(cntx, IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
-	            
+	            IPacket pkt = eth.getPayload();
+	            if (!(pkt instanceof IPv4))
+	    			return Command.CONTINUE;
 	            MacAddress srcMac = eth.getSourceMACAddress();
 	            VlanVid vlanId = VlanVid.ofVlan(eth.getVlanID());
-	            logger.info("eth: {}", eth.getEtherType().toString());
 	            if (eth.getEtherType() == EthType.IPv4) {
 	                /* We got an IPv4 packet; get the payload from Ethernet */
-	                IPv4 ipv4 = (IPv4) eth.getPayload();
+	                IPv4 ipv4 = (IPv4) pkt;
 	                
+	                if(!(ipv4.getProtocol() == IpProtocol.TCP))
+	                	return Command.CONTINUE;
 	                byte[] ipOptions = ipv4.getOptions();
 	                IPv4Address dstIp = ipv4.getDestinationAddress();
 	                String ipSrc = ipv4.getSourceAddress().toString();
 	                String ipDst = dstIp.toString();
+	                logger.info("<><><>SrcIp: {} ; DstIP: {}", ipSrc, ipDst);
 	                if ((ipDst.compareTo("10.10.0.3") == 0) || (ipDst.compareTo("10.10.0.4") == 0) || (ipDst.compareTo("10.10.0.5") == 0)) {
-	                	if(ipv4.getProtocol() == IpProtocol.TCP) {
-		                    /* We got a TCP packet; get the payload from IPv4 */
-		                    TCP tcp = (TCP) ipv4.getPayload();
-		      
-		                    /* Various getters and setters are exposed in TCP */
-		                    TransportPort srcPort = tcp.getSourcePort();
-		                    TransportPort dstPort = tcp.getDestinationPort();
-		                    if((dstPort.toString().compareTo("5001") == 0) || (dstPort.toString().compareTo("5002") == 0)) {
+	                    /* We got a TCP packet; get the payload from IPv4 */
+	                    TCP tcp = (TCP) ipv4.getPayload();
+	      
+	                    /* Various getters and setters are exposed in TCP */
+	                    TransportPort srcPort = tcp.getSourcePort();
+	                    TransportPort dstPort = tcp.getDestinationPort();
+	                    if((dstPort.toString().compareTo("5001") == 0) || (dstPort.toString().compareTo("5002") == 0)) {
 //		                    	Optional<VirtualGatewayInstance> instance = getGatewayInstance(sw.getId());
-		                    	VirtualGatewayInstance gateway = null;
-		//	                    short flags = tcp.getFlags();
-			                    OFMessage outMessage = null;
-			                	OFMessage outMessage2 = null;
-			                	OFMessage outMessage3;
-			                	HubType ht = HubType.USE_PACKET_OUT;
-			                	switch (ht) {
-			            	    	case USE_FLOW_MOD:
-			            	            outMessage = createHubFlowMod(sw, msg);
-			            	            outMessage2 = createHubFlowMod(sw, msg);
-			            	            outMessage3 = createHubFlowMod(sw, msg);
-			            	            break;
-			            	        default:
-			            	    	case USE_PACKET_OUT:
+	                    	VirtualGatewayInstance gateway = null;
+	//	                    short flags = tcp.getFlags();
+		                    OFMessage outMessage = null;
+		                	OFMessage outMessage2 = null;
+		                	OFMessage outMessage3;
+		                	HubType ht = HubType.USE_PACKET_OUT;
+		                	switch (ht) {
+		            	    	case USE_FLOW_MOD:
+		            	            outMessage = createHubFlowMod(sw, msg);
+		            	            outMessage2 = createHubFlowMod(sw, msg);
+		            	            outMessage3 = createHubFlowMod(sw, msg);
+		            	            break;
+		            	        default:
+		            	    	case USE_PACKET_OUT:
 //			            	    		logger.info("=>Sending from {} to {}",ipSrc, ipDst);
 //		            	    			createHubPacketOut(sw, msg, eth, ipv4);
-			            	    		if(ipDst.compareTo("10.10.0.3") == 0)
-			            	    		{
-			            	    			logger.info("=>Sending from {} to {} through 4 and 5",ipSrc, ipDst);
-			            	    			logger.info("=>Sending from {} to {} through 1", new Object[] {ipSrc, ipDst, sw.getId()});
-			            	    			createHubPacketOut(sw, msg, 4, eth, ipv4, cntx, gateway);
+		            	    		if(ipDst.compareTo("10.10.0.3") == 0)
+		            	    		{
+//		            	    			logger.info("=>Sending from {} to {} through 4 and 5",ipSrc, ipDst);
+		            	    			logger.info("=>Sending from {} to {} through {} 3 and 4", new Object[] {ipSrc, ipDst, sw.getId()});
+		            	    			createHubPacketOut(sw, msg, 4, eth, ipv4, cntx, gateway);
 //			            	    			createHubPacketOut(sw, msg, 5, eth, ipv4, cntx, gateway);
-			            	    		}
-			            	    		else if(ipDst.compareTo("10.10.0.4") == 0)
-			            	    		{
-			            	    			logger.info("=>Sending from {} to {} through 3 and 5",ipSrc, ipDst);
-			            	    			logger.info("=>Sending from {} to {} through 1", new Object[] {ipSrc, ipDst, sw.getId()});
-			            	    			createHubPacketOut(sw, msg, 3, eth, ipv4, cntx, gateway);
+		            	    		}
+		            	    		else if(ipDst.compareTo("10.10.0.4") == 0)
+		            	    		{
+//		            	    			logger.info("=>Sending from {} to {} through 3 and 5",ipSrc, ipDst);
+		            	    			logger.info("=>Sending from {} to {} through {} 3 and 4", new Object[] {ipSrc, ipDst, sw.getId()});
+		            	    			createHubPacketOut(sw, msg, 3, eth, ipv4, cntx, gateway);
 //			            	    			createHubPacketOut(sw, msg, 5, eth, ipv4, cntx, gateway);
-			            	    		}
-			            	    		else if(ipDst.compareTo("10.10.0.5") == 0)
-			            	    		{
-			            	    			logger.info("=>Sending from {} to {} through {} 3 and 4",ipSrc, ipDst);
-			            	    			logger.info("=>Sending from {} to {} through 1", new Object[] {ipSrc, ipDst, sw.getId()});
-			            	    			createHubPacketOut(sw, msg, 3, eth, ipv4, cntx, gateway);
-			            	    			createHubPacketOut(sw, msg, 4, eth, ipv4, cntx, gateway);
-			            	    		}
-			            	            
-			            	            break;
-			                	}
+		            	    		}
+		            	    		else if(ipDst.compareTo("10.10.0.5") == 0)
+		            	    		{
+//		            	    			logger.info("=>Sending from {} to {} through {} 3 and 4",ipSrc, ipDst);
+		            	    			logger.info("=>Sending from {} to {} through {} 3 and 4", new Object[] {ipSrc, ipDst, sw.getId()});
+		            	    			createHubPacketOut(sw, msg, 3, eth, ipv4, cntx, gateway);
+		            	    			createHubPacketOut(sw, msg, 4, eth, ipv4, cntx, gateway);
+		            	    		}
+		            	            
+		            	            break;
+		                	}
 //			                	sw.write(outMessage);
 //			                    sw.write(outMessage2);
-	//		                    sw.write(outMessage3);
-		                    }
-                		}
+//		                    sw.write(outMessage3);
+	                    }
 	                }
-	                else if ((ipSrc.compareTo("10.10.0.3") == 0) || (ipSrc.compareTo("10.10.0.4") == 0))
+	                else if ((ipDst.compareTo("10.10.0.1") == 0) || (ipDst.compareTo("10.10.0.2") == 0))
 	                {
-	                	if(ipv4.getProtocol() == IpProtocol.TCP) {
-		                    /* We got a TCP packet; get the payload from IPv4 */
-		                    TCP tcp = (TCP) ipv4.getPayload();
-		      
-		                    /* Various getters and setters are exposed in TCP */
-		                    TransportPort srcPort = tcp.getSourcePort();
-		                    TransportPort dstPort = tcp.getDestinationPort();
-		                    if((srcPort.toString().compareTo("5001") == 0) || (srcPort.toString().compareTo("5002") == 0)) {
-		                    	Optional<VirtualGatewayInstance> instance = getGatewayInstance(sw.getId());
-		                    	VirtualGatewayInstance gateway = null;
-		//	                    short flags = tcp.getFlags();
-			                    OFMessage outMessage;
-			                	OFMessage outMessage2;
-			                	OFMessage outMessage3;
-			                	HubType ht = HubType.USE_PACKET_OUT;
-			                	switch (ht) {
-			            	    	case USE_FLOW_MOD:
-			            	            createHubFlowMod(sw, msg);
-			            	            createHubFlowMod(sw, msg);
-			            	            createHubFlowMod(sw, msg);
-			            	            break;
-			            	        default:
-			            	    	case USE_PACKET_OUT:
+	                	logger.info("<><><>DstIP: {}", ipDst);
+	                	/* We got a TCP packet; get the payload from IPv4 */
+	                    TCP tcp = (TCP) ipv4.getPayload();
+	      
+	                    /* Various getters and setters are exposed in TCP */
+	                    TransportPort srcPort = tcp.getSourcePort();
+	                    TransportPort dstPort = tcp.getDestinationPort();
+	                    if((dstPort.toString().compareTo("5001") == 0) || (dstPort.toString().compareTo("5002") == 0)) {
+//	                    	Optional<VirtualGatewayInstance> instance = getGatewayInstance(sw.getId());
+	                    	VirtualGatewayInstance gateway = null;
+	//	                    short flags = tcp.getFlags();
+		                    OFMessage outMessage = null;
+		                	OFMessage outMessage2 = null;
+		                	OFMessage outMessage3;
+		                	HubType ht = HubType.USE_PACKET_OUT;
+		                	switch (ht) {
+		            	    	case USE_FLOW_MOD:
+		            	            createHubFlowMod(sw, msg);
+		            	            createHubFlowMod(sw, msg);
+		            	            createHubFlowMod(sw, msg);
+		            	            break;
+		            	        default:
+		            	    	case USE_PACKET_OUT:
 //			            	    		if(ipDst.compareTo("10.10.0.1") == 0)
 //			            	    		{
 //			            	    			logger.info("Sending from {} to {} through 2",ipSrc, ipDst);
@@ -319,27 +321,16 @@ public class Hub extends ForwardingBase implements IFloodlightModule, IOFMessage
 //			            	    		}
 //			            	    		else
 //			            	    		{
-			            	    			logger.info("=>Sending from {} to {} through 1", new Object[] {ipSrc, ipDst, sw.getId()});
-			            	    			createHubPacketOut(sw, msg, 1,eth, ipv4, cntx, gateway);
+	            	    			logger.info("=>Sending from {} to {} through 1", new Object[] {ipSrc, ipDst, sw.getId()});
+	            	    			createHubPacketOut(sw, msg, 1,eth, ipv4, cntx, gateway);
 //			            	    		}
-//			            	            break;
-			                	}
+			            	            break;
+		                	}
 //			                    sw.write(outMessage);
-	//		                    sw.write(outMessage2);
-	//		                    sw.write(outMessage3);
-		                    }
-                		}
+//		                    sw.write(outMessage2);
+//		                    sw.write(outMessage3);
+	                    }
 	                }
-	                else
-	                {
-//	                	OFPacketIn pi = (OFPacketIn) msg;
-//		            	doL2ForwardFlow(sw, pi, null, cntx, false);
-	                }
-	            }
-	            else
-	            {
-//	            	OFPacketIn pi = (OFPacketIn) msg;
-//	            	doL2ForwardFlow(sw, pi, null, cntx, false);
 	            }
 	            break;
 	        default:
@@ -372,8 +363,8 @@ public class Hub extends ForwardingBase implements IFloodlightModule, IOFMessage
 //        IPv4Address dstIP = IPv4Address.of(10,10, 0, 4);
 //        IPv4Address intfIpAddress = findInterfaceIP(gateway, dstIP);
         
-        MacAddress dstMac = MacAddress.of("00:00:00:00:00:04" );
-    	MacAddress srcMac = MacAddress.of("00:00:00:00:00:01" );
+        MacAddress dstMac = MacAddress.of("00:00:00:00:00:0"+ String.valueOf(port) );
+    	MacAddress srcMac = eth.getSourceMACAddress();
         
         Ethernet l2 = new Ethernet();
     	l2.setSourceMACAddress(srcMac);
@@ -381,8 +372,8 @@ public class Hub extends ForwardingBase implements IFloodlightModule, IOFMessage
     	l2.setEtherType(EthType.IPv4);
     	logger.info("srcMac: {} dstMac: {}", srcMac.toString(), dstMac.toString());
     	
-    	IPv4Address dstIp = IPv4Address.of(10, 10, 0, 4);
-    	IPv4Address srcIp = IPv4Address.of(10, 10, 0, 1);
+    	IPv4Address dstIp = IPv4Address.of(10, 10, 0, port);
+    	IPv4Address srcIp = ipv4.getSourceAddress();
     	
     	IPv4 l3 = new IPv4();
     	l3.setSourceAddress(srcIp);
@@ -446,8 +437,8 @@ public class Hub extends ForwardingBase implements IFloodlightModule, IOFMessage
 
 //        Set<OFPort> broadcastPorts = this.topologyService.getSwitchBroadcastPorts(sw.getId());
         Set<OFPort> broadcastPorts = new HashSet<OFPort>();//this.topologyService.getSwitchBroadcastPorts(sw.getId());
-//      broadcastPorts.add(OFPort.of(3));
-      broadcastPorts.add(OFPort.of(4));
+      broadcastPorts.add(OFPort.of(port));
+//      broadcastPorts.add(OFPort.of(4));
 //      broadcastPorts.add(OFPort.of(5));
         if (broadcastPorts.isEmpty()) {
             log.debug("No broadcast ports found. Using FLOOD output action");
