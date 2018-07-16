@@ -32,6 +32,7 @@ import net.floodlightcontroller.devicemanager.SwitchPort;
 import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryService;
 import net.floodlightcontroller.packet.Ethernet;
 import net.floodlightcontroller.packet.IPacket;
+import net.floodlightcontroller.packet.IPv4;
 import net.floodlightcontroller.restserver.IRestApiService;
 import net.floodlightcontroller.topology.ITopologyService;
 import net.floodlightcontroller.util.*;
@@ -39,8 +40,10 @@ import net.floodlightcontroller.util.*;
 import org.projectfloodlight.openflow.protocol.*;
 import org.projectfloodlight.openflow.protocol.match.Match;
 import org.projectfloodlight.openflow.protocol.match.MatchField;
+import org.projectfloodlight.openflow.protocol.oxm.OFOxms;
 import org.projectfloodlight.openflow.protocol.action.OFAction;
 import org.projectfloodlight.openflow.protocol.action.OFActionOutput;
+import org.projectfloodlight.openflow.protocol.action.OFActions;
 import org.projectfloodlight.openflow.types.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -336,21 +339,71 @@ public abstract class ForwardingBase implements IOFMessageListener {
      */
     public void packetOutMultiPort(byte[] packetData, IOFSwitch sw, 
             OFPort inPort, Set<OFPort> outPorts, FloodlightContext cntx) {
+    	
+    	Ethernet eth = IFloodlightProviderService.bcStore.get(cntx,
+                IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
+    	Ethernet eth2 = IFloodlightProviderService.bcStore.get(cntx,
+                IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
+    	Ethernet eth3 = IFloodlightProviderService.bcStore.get(cntx,
+                IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
+
+        /* Compose L2 packet. */
+        eth.setSourceMACAddress(MacAddress.of(1));
+        eth.setDestinationMACAddress(MacAddress.of(3));
+        
+        eth2.setSourceMACAddress(MacAddress.of(1));
+        eth2.setDestinationMACAddress(MacAddress.of(4));
+        
+        eth3.setSourceMACAddress(MacAddress.of(1));
+        eth3.setDestinationMACAddress(MacAddress.of(5));
+                
+        /* Compose L3 packet. */
+        IPv4 ipv4 = (IPv4) eth.getPayload();
+        ipv4.setSourceAddress(IPv4Address.of("10.10.0.1"));
+        ipv4.setDestinationAddress(IPv4Address.of("10.10.0.3"));
+        
+        IPv4 ipv4_2 = (IPv4) eth2.getPayload();
+        ipv4_2.setSourceAddress(IPv4Address.of("10.10.0.1"));
+        ipv4_2.setDestinationAddress(IPv4Address.of("10.10.0.4"));
+        
+        IPv4 ipv4_3 = (IPv4) eth3.getPayload();
+        ipv4_3.setSourceAddress(IPv4Address.of("10.10.0.1"));
+        ipv4_3.setDestinationAddress(IPv4Address.of("10.10.0.5"));
+        
+        /* Set L2's payload as the L3 packet. */
+        eth.setPayload(ipv4);
+        eth2.setPayload(ipv4_2);
+        eth3.setPayload(ipv4_3);
+                
+//      createOutPacket();
+//        Match.Builder mb = sw.getOFFactory().buildMatch();
+//		mb.setExact(MatchField.IN_PORT, inPort)
+//		.setExact(MatchField.ETH_SRC, MacAddress.of("00:00:00:00:00:01"))
+//		.setExact(MatchField.ETH_DST, MacAddress.of("00:00:00:00:00:04"));
         //setting actions
         List<OFAction> actions = new ArrayList<>();
 
         Iterator<OFPort> j = outPorts.iterator();
-
+        OFActions action = sw.getOFFactory().actions();
+        OFOxms oxms = sw.getOFFactory().oxms();
+        action.buildSetField()
+        .setField(
+            oxms.buildIpv4Dst()
+            .setValue(IPv4Address.of("255.255.255.255"))
+            .build()
+        )
+        .build();
+    actionList.add(setNwDst);
         while (j.hasNext()) {
             actions.add(sw.getOFFactory().actions().output(j.next(), 0));
         }
-
+        
         OFPacketOut.Builder pob = sw.getOFFactory().buildPacketOut();
         pob.setActions(actions);
+        pob.setData(eth2.serialize());
 
         pob.setBufferId(OFBufferId.NO_BUFFER);
         OFMessageUtils.setInPort(pob, inPort);
-
         pob.setData(packetData);
 
         if (log.isTraceEnabled()) {
@@ -361,7 +414,37 @@ public abstract class ForwardingBase implements IOFMessageListener {
         messageDamper.write(sw, pob.build());
     }
 
-    /**
+//    private void createOutPacket() {
+//    	/* Compose L2 packet. */
+//    	Ethernet eth = new Ethernet();
+//    	eth.setSourceMACAddress(MacAddress.of(1));
+//    	eth.setDestinationMACAddress(MacAddress.of(2));
+//    	
+//    	/* Compose L3 packet. */
+//    	IPv4 ipv4 = new IPv4();
+//    	ipv4.setSourceAddress(IPv4Address.of("192.168.1.1"));
+//    	ipv4.setDestinationAddress(IPv4Address.of(0xffFFffFF));
+//		
+//    	/* Set L2's payload as the L3 packet. */
+//    	eth.setPayload(ipv4);
+//    	
+//    	/* Specify the switch port(s) which the packet should be sent out. */
+//    	OFActionOutput output = myFactory.actions().buildOutput()
+//    	    .setPort(OFPort.FLOOD)
+//    	    .build();
+//    	 
+//    	/* 
+//    	 * Compose the OFPacketOut with the above Ethernet packet as the 
+//    	 * payload/data, and the specified output port(s) as actions.
+//    	 */
+//    	OFPacketOut myPacketOut = factory.buildPacketOut()
+//    	    .setData(eth.serialize())
+//    	    .setBufferId(OFBufferId.NO_BUFFER)
+//    	   .setActions(Collections.singletonList((OFAction) output))
+//    	    .build();
+//	}
+
+	/**
      * @see packetOutMultiPort
      * Accepts a PacketIn instead of raw packet data. Note that the inPort
      * and switch can be different than the packet in switch/port
