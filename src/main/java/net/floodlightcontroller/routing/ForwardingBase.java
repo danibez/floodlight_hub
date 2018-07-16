@@ -361,6 +361,14 @@ public abstract class ForwardingBase implements IOFMessageListener {
 			            .build()
 			        )
 			        .build();
+        	OFActionSetField setDlDst = action.buildSetField()
+        		    .setField(
+        		        oxms.buildEthDst()
+        		        .setValue(MacAddress.of("00:00:00:00:00:0"+port.getPortNumber()))
+        		        .build()
+        		    )
+        		    .build();
+        	actions.add(setDlDst);
         	actions.add(setNwDst);
             actions.add(sw.getOFFactory().actions().output(port, 0));
         }
