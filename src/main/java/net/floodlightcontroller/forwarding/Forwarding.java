@@ -664,7 +664,7 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
             /* Various getters and setters are exposed in TCP */
             TransportPort srcPort = tcp.getSourcePort();
             TransportPort dstPort = tcp.getDestinationPort();
-            if((dstPort.toString().compareTo("5001") == 0) || (dstPort.toString().compareTo("5002") == 0)) {
+            if(dstPort.toString().compareTo("5672") == 0) {
 //              Optional<VirtualGatewayInstance> instance = getGatewayInstance(sw.getId());
             	VirtualGatewayInstance gateway = null;
 //	            short flags = tcp.getFlags();
