@@ -43,6 +43,7 @@ import org.projectfloodlight.openflow.protocol.match.MatchField;
 import org.projectfloodlight.openflow.protocol.oxm.OFOxms;
 import org.projectfloodlight.openflow.protocol.action.OFAction;
 import org.projectfloodlight.openflow.protocol.action.OFActionOutput;
+import org.projectfloodlight.openflow.protocol.action.OFActionSetField;
 import org.projectfloodlight.openflow.protocol.action.OFActions;
 import org.projectfloodlight.openflow.types.*;
 import org.slf4j.Logger;
@@ -384,18 +385,29 @@ public abstract class ForwardingBase implements IOFMessageListener {
         List<OFAction> actions = new ArrayList<>();
 
         Iterator<OFPort> j = outPorts.iterator();
+        
         OFActions action = sw.getOFFactory().actions();
         OFOxms oxms = sw.getOFFactory().oxms();
-        action.buildSetField()
-        .setField(
-            oxms.buildIpv4Dst()
-            .setValue(IPv4Address.of("255.255.255.255"))
-            .build()
-        )
-        .build();
-    actionList.add(setNwDst);
+//        OFActionSetField setNwDst = action.buildSetField()
+//												        .setField(
+//												            oxms.buildIpv4Dst()
+//												            .setValue(IPv4Address.of("10.10.0.4"))
+//												            .build()
+//												        )
+//												        .build();
+//        actions.add(setNwDst);
+        OFPort port;
         while (j.hasNext()) {
-            actions.add(sw.getOFFactory().actions().output(j.next(), 0));
+        	port = j.next();
+        	OFActionSetField setNwDst = action.buildSetField()
+			        .setField(
+			            oxms.buildIpv4Dst()
+			            .setValue(IPv4Address.of("10.10.0."+port.getPortNumber()))
+			            .build()
+			        )
+			        .build();
+        	actions.add(setNwDst);
+            actions.add(sw.getOFFactory().actions().output(port, 0));
         }
         
         OFPacketOut.Builder pob = sw.getOFFactory().buildPacketOut();
