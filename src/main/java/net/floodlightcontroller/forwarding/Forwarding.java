@@ -623,7 +623,7 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
         		IPv4 ipv4 = (IPv4) eth.getPayload();
         		if (ipv4.getProtocol() == IpProtocol.TCP) {
 		        	TCP tcp = (TCP) ipv4.getPayload();
-		        	if((tcp.getDestinationPort().toString().compareTo("5001") == 0) || (tcp.getSourcePort().toString().compareTo("5001") == 0))
+		        	if(tcp.getDestinationPort().toString().compareTo("5672") == 0)
 		        	{
 //		        		ipv4.setDestinationAddress(destinationAddress)
 		        		String ipSrc = ipv4.getSourceAddress().toString();
