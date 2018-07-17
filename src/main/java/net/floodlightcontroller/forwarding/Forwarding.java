@@ -764,7 +764,8 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 			}
 		}
 		if(!found) {
-			masterPort = p;
+			if(masterPort == 0)
+				masterPort = p;
 			return true;
 		}
 		if(p != masterPort)
