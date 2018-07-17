@@ -663,13 +663,20 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 //		        			if(masterPort == 0)
 		        			boolean op = setMaster(hostPorts, ipSrc);		        			
 		        			if(op) {
+		        				ipSrc = ipv4.getSourceAddress().toString();
+		        				String ipDst = ipv4.getDestinationAddress().toString();
+		        				int pin = getPortFromIp(ipSrc);
+		        				int pout = getPortFromIp(ipDst);
+		        				Set<OFPort> outPort = new HashSet<OFPort>();
+		        				outPort.add(OFPort.of(pout));
 //	        					pi = fixIpSrc(sw, pi.getData(),hostPorts, ipSrc);
-		        				doL2ForwardFlow(sw, pi, decision, cntx, false);
+		        				log.info("master: {}, ip: {}", pin, ipSrc);
+		        				packetOutMultiPort(pi, sw, OFPort.of(pin), outPort, cntx);
+//		        				doL2ForwardFlow(sw, pi, decision, cntx, false);
 //		        				log.info("master: {}, ip: {}", masterPort, ipSrc);
 //		        				packetOutMultiPort(pi, sw, OFPort.of(masterPort), hostPorts, cntx);
 		        			}
 		        			else {
-		        				log.info("master: {}, ip: {}", masterPort, ipSrc);
 		        				doDropFlow(sw, pi, decision, cntx);
 		        			}
 		        		}
