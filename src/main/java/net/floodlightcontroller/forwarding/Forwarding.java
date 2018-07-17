@@ -631,7 +631,7 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
         		IPv4 ipv4 = (IPv4) eth.getPayload();
         		if (ipv4.getProtocol() == IpProtocol.TCP) {
 		        	TCP tcp = (TCP) ipv4.getPayload();
-		        	if(tcp.getDestinationPort().toString().compareTo("5001") == 0)
+		        	if(tcp.getDestinationPort().toString().compareTo("5672") == 0)
 		        	{
 //		        		ipv4.setDestinationAddress(destinationAddress)
 		        		ipSrc = ipv4.getSourceAddress().toString();
@@ -653,7 +653,7 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 		        		else
 		        			doL2ForwardFlow(sw, pi, decision, cntx, false);
 		        	}
-		        	else if(tcp.getSourcePort().toString().compareTo("5001") == 0) {
+		        	else if(tcp.getSourcePort().toString().compareTo("5672") == 0) {
 		        		ipSrc = ipv4.getSourceAddress().toString();
 		        		if ((ipSrc.compareTo("10.10.0.3") == 0) || (ipSrc.compareTo("10.10.0.4") == 0) || (ipSrc.compareTo("10.10.0.5") == 0)) {
 //		        			doL2ForwardFlow(sw, pi, decision, cntx, false);
