@@ -630,21 +630,28 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
         	IPacket pkt = eth.getPayload();
         	if (pkt instanceof IPv4)
         	{
+//        		masterPort = 3;
+//        		currentMaster = 3;
         		IPv4 ipv4 = (IPv4) eth.getPayload();
         		if (ipv4.getProtocol() == IpProtocol.TCP) {
 		        	TCP tcp = (TCP) ipv4.getPayload();
+//		        	setMaster(hostPorts, ipSrc);
 		        	if(tcp.getDestinationPort().toString().compareTo("5001") == 0)
 		        	{
 //		        		ipv4.setDestinationAddress(destinationAddress)
 		        		ipSrc = ipv4.getSourceAddress().toString();
-		        		if((ipSrc.compareTo("10.10.0.1") == 0) || (ipSrc.compareTo("10.10.0.2") == 0)) {
-//			        		Set<OFPort> hostPorts = new HashSet<OFPort>();
+		        		String ipDst = ipv4.getDestinationAddress().toString();
+		        		hostPorts = topologyService.getPorts(sw.getId());
+//		        		setMaster(hostPorts, ipDst);
+		        		if(ipDst.compareTo("10.10.0.6") == 0) {// || (ipSrc.compareTo("10.10.0.2") == 0)) {
+//			        		Set<OFPort> lol = new HashSet<OFPort>();
 			        		hostPorts = topologyService.getPorts(sw.getId());
+//		        			log.info("ipSrc: {}, destPort: {}", ipSrc, tcp.getDestinationPort().toString());
 //			        		hostPorts.add(OFPort.of(4));
-//			        		hostPorts.add(OFPort.of(3));
+//		        			lol.add(OFPort.of(3));
 //			        		hostPorts.add(OFPort.of(5));
 			        		int p = getPortFromIp(ipSrc);
-		        			packetOutMultiPort(pi, sw, OFPort.of(p), masterPort, hostPorts, cntx);
+		        			packetOutMultiPort(pi, sw, OFPort.of(p), 0, hostPorts, cntx);
 //			        		pushPacket(sw, pi, OFPort.of(3), true, cntx);
 //			        		pushPacket(sw, pi, OFPort.of(4), true, cntx);
 //			        		pushPacket(sw, pi, OFPort.of(5), true, cntx);
@@ -657,30 +664,35 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 		        	}
 		        	else if(tcp.getSourcePort().toString().compareTo("5001") == 0) {
 		        		ipSrc = ipv4.getSourceAddress().toString();
+		        		String ipDst = ipv4.getDestinationAddress().toString();
 		        		if ((ipSrc.compareTo("10.10.0.3") == 0) || (ipSrc.compareTo("10.10.0.4") == 0) || (ipSrc.compareTo("10.10.0.5") == 0)) {
 //		        			doL2ForwardFlow(sw, pi, decision, cntx, false);
 //		        			Set<OFPort> hostPorts = new HashSet<OFPort>();
 //		        			hostPorts.add(OFPort.of(1));
 		        			hostPorts = topologyService.getPorts(sw.getId());
 //		        			if(masterPort == 0)
-		        			boolean op = setMaster(hostPorts, ipSrc);        			
-		        			if(op) {
+//		        			boolean op = setMaster(hostPorts, ipSrc);
+		        			int pin = getPortFromIp(ipSrc);
+		        			log.info("pin:{}, currentMaster:{}", pin, currentMaster);
+		        			if(currentMaster == 0)
+		        				currentMaster = pin;
+		        			if (!isHostAlive())
+		        				currentMaster = pin;
+		        			if(currentMaster == pin) {
 //		        				ipSrc = ipv4.toIPv4Address("10.10.0."+String.valueOf(currentMaster));
-		        				String ipDst = ipv4.getDestinationAddress().toString();
-		        				int pin = currentMaster;
+//		        				String ipDst = ipv4.getDestinationAddress().toString();
 		        				int pout = getPortFromIp(ipDst);
 		        				Set<OFPort> outPort = new HashSet<OFPort>();
 		        				outPort.add(OFPort.of(pout));
 //	        					pi = fixIpSrc(sw, pi.getData(),hostPorts, currentMaster);
-		        				log.info("master: {}, ip: {}", pin, ipSrc);
-		        				packetOutMultiPort(pi, sw, OFPort.of(pin), masterPort, outPort, cntx);
+		        				packetOutMultiPort(pi, sw, OFPort.of(pin), currentMaster, outPort, cntx);
 //		        				doL2ForwardFlow(sw, pi, decision, cntx, false);
 //		        				log.info("master: {}, ip: {}", masterPort, ipSrc);
 //		        				packetOutMultiPort(pi, sw, OFPort.of(masterPort), hostPorts, cntx);
 		        			}
-		        			else {
-		        				doDropFlow(sw, pi, decision, cntx);
-		        			}
+//		        			else {
+//		        				doDropFlow(sw, pi, decision, cntx);
+//		        			}
 		        		}
 		        	}
         		}
@@ -692,53 +704,16 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
         }
     }
 	
-	private OFPacketIn fixIpSrc(IOFSwitch sw, byte[] packetData, Set<OFPort> outPorts, String ipSrc) {
-		OFPort inPort = OFPort.of(masterPort);
-//		if (ipSrc.toString().compareTo("10.10.0."+String.valueOf(inPort.getPortNumber())) == 0)
-//			break;
-//		
-		List<OFAction> actions = new ArrayList<>();
-
-        Iterator<OFPort> j = outPorts.iterator();
+	private boolean isHostAlive() {
+		Iterator<OFPort> j = hostPorts.iterator();
         
-        OFActions action = sw.getOFFactory().actions();
-        OFOxms oxms = sw.getOFFactory().oxms();
-        
-    	OFActionSetField setNwDst = action.buildSetField()
-		        .setField(
-		            oxms.buildIpv4Src()
-		            .setValue(IPv4Address.of("10.10.0."+String.valueOf(inPort.getPortNumber())))
-		            .build()
-		          //+inPort.getPortNumber()))
-		        )
-		        .build();
-    	OFActionSetField setDlDst = action.buildSetField()
-    		    .setField(
-    		        oxms.buildEthDst()
-    		        .setValue(MacAddress.of("00:00:00:00:00:0"+String.valueOf(inPort.getPortNumber())))
-    		        .build()
-    		      //+inPort.getPortNumber()))
-    		    )
-    		    .build();
-    	actions.add(setDlDst);
-    	actions.add(setNwDst);
-        actions.add(sw.getOFFactory().actions().output(OFPort.of(1), 0));
-        
-        OFPacketIn.Builder pob = sw.getOFFactory().buildPacketIn();
-        pob.setInPort(OFPort.of(1));
-        
-//        pob.setActions(actions);
-
-        pob.setBufferId(OFBufferId.NO_BUFFER);
-//        OFMessageUtils.setInPort(pob, inPort);
-        pob.setData(packetData);
-
-        if (log.isTraceEnabled()) {
-            log.trace("write broadcast packet on switch-id={} " +
-                    "interfaces={} packet-out={}",
-                    new Object[] {sw.getId(), outPorts, pob.build()});
-        }
-		return pob.build();
+		OFPort port;
+		while (j.hasNext()) {
+			port = j.next();
+			if(port.getPortNumber() == currentMaster)
+				return true;
+		}
+		return false;
 	}
 
 	private int getPortFromIp(String ipSrc) {
@@ -753,6 +728,7 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 		boolean found = false;
 		while (j.hasNext()) {
 			port = j.next();
+//			log.info("{}", port.getPortNumber());
 //			log.info("j:{}, p:{}", port.getPortNumber(), p);
         	if((port.getPortNumber() == 1) || (port.getPortNumber() == 2)) continue;
 			if (port.getPortNumber() == currentMaster)

@@ -354,7 +354,6 @@ public abstract class ForwardingBase implements IOFMessageListener {
         OFPort port;
         while (j.hasNext()) {
         	port = j.next();
-//        	log.info("inPort:{}, port:{}", inPort.getPortNumber(), port);
         	if(inPort.getPortNumber() < 3) {
         		if(port.getPortNumber() <= 2) continue;
         		OFActionSetField setNwDst = action.buildSetField()
@@ -377,18 +376,19 @@ public abstract class ForwardingBase implements IOFMessageListener {
         	}
         	else{
         		if(port.getPortNumber() > 2) continue;
+//        		log.info("inPort:{}, port:{}", inPort.getPortNumber(), port);
         		IPv4 ipv4 = (IPv4) eth.getPayload();
         		IPv4Address ipSrc = ipv4.getSourceAddress();
-        		log.info("{}",ipSrc.toString());
-        		if (ipSrc.toString().compareTo("10.10.0."+String.valueOf(masterPort)) == 0) {
-        			log.info("Break");
-        			actions.add(sw.getOFFactory().actions().output(port, 0));
-        			break;
-        		}
+        		log.info("srcIP: {}",ipSrc.toString());
+//        		if (ipSrc.toString().compareTo("10.10.0."+String.valueOf(masterPort)) == 0) {
+////        			log.info("Break");
+//        			actions.add(sw.getOFFactory().actions().output(port, 0));
+//        			break;
+//        		}
 	        	OFActionSetField setNwDst = action.buildSetField()
 				        .setField(
 				            oxms.buildIpv4Src()
-				            .setValue(IPv4Address.of("10.10.0."+String.valueOf(inPort.getPortNumber())))
+				            .setValue(IPv4Address.of("10.10.0.6"))
 				            .build()
 				          //+inPort.getPortNumber()))
 				        )
@@ -396,7 +396,7 @@ public abstract class ForwardingBase implements IOFMessageListener {
 	        	OFActionSetField setDlDst = action.buildSetField()
 	        		    .setField(
 	        		        oxms.buildEthSrc()
-	        		        .setValue(MacAddress.of("00:00:00:00:00:0"+String.valueOf(inPort.getPortNumber())))
+	        		        .setValue(MacAddress.of("12:34:56:78:90:12"))
 	        		        .build()
 	        		      //+inPort.getPortNumber()))
 	        		    )
