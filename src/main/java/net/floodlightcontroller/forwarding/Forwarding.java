@@ -636,7 +636,7 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
         		if (ipv4.getProtocol() == IpProtocol.TCP) {
 		        	TCP tcp = (TCP) ipv4.getPayload();
 //		        	setMaster(hostPorts, ipSrc);
-		        	if(tcp.getDestinationPort().toString().compareTo("5672") == 0)
+		        	if(tcp.getDestinationPort().toString().compareTo("5001") == 0)
 		        	{
 //		        		ipv4.setDestinationAddress(destinationAddress)
 		        		ipSrc = ipv4.getSourceAddress().toString();
@@ -662,7 +662,7 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 		        		else
 		        			doL2ForwardFlow(sw, pi, decision, cntx, false);
 		        	}
-		        	else if(tcp.getSourcePort().toString().compareTo("5672") == 0) {
+		        	else if(tcp.getSourcePort().toString().compareTo("5001") == 0) {
 		        		ipSrc = ipv4.getSourceAddress().toString();
 		        		String ipDst = ipv4.getDestinationAddress().toString();
 		        		if ((ipSrc.compareTo("10.10.0.3") == 0) || (ipSrc.compareTo("10.10.0.4") == 0) || (ipSrc.compareTo("10.10.0.5") == 0)) {
@@ -673,7 +673,8 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 //		        			if(masterPort == 0)
 //		        			boolean op = setMaster(hostPorts, ipSrc);
 		        			int pin = getPortFromIp(ipSrc);
-		        			log.info("pin:{}, currentMaster:{}", pin, currentMaster);
+//		        			log.info("pin:{}, currentMaster:{}", pin, currentMaster);
+		        			log.info("{}",tcp.getDestinationPort().toString());
 		        			if(currentMaster == 0)
 		        				currentMaster = pin;
 		        			if (!isHostAlive())

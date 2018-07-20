@@ -395,16 +395,11 @@ public abstract class ForwardingBase implements IOFMessageListener {
         	}
         	else{
 //        		log.info("port: {}",port.getPortNumber());
-//        		if(port.getPortNumber() > 2)
-//        		{
-//        			if(port.getPortNumber() == 1)
-//        				outPorts.add(OFPort.of(6));
-//        			continue;
-//        		}
+//        		if(port.getPortNumber() > 2) continue;
 //        		log.info("inPort:{}, port:{}", inPort.getPortNumber(), port);
         		IPv4 ipv4 = (IPv4) eth.getPayload();
         		IPv4Address ipSrc = ipv4.getSourceAddress();
-//        		log.info("srcIP: {}, dstIp: {}",ipSrc.toString(), ipv4.getDestinationAddress().toString());
+        		log.info("srcIP: {}, dstIp: {}",ipSrc.toString(), ipv4.getDestinationAddress().toString());
 //        		if (ipSrc.toString().compareTo("10.10.0."+String.valueOf(masterPort)) == 0) {
 ////        			log.info("Break");
 //        			actions.add(sw.getOFFactory().actions().output(port, 0));
@@ -447,7 +442,7 @@ public abstract class ForwardingBase implements IOFMessageListener {
             	actions.add(setNwDst);
             	actions.add(setDlSrc);
             	actions.add(setNwSrc);
-	            actions.add(sw.getOFFactory().actions().output(inPort, 0));
+	            actions.add(sw.getOFFactory().actions().output(OFPort.of(1), 0));
 	            break;
         	}
         }
