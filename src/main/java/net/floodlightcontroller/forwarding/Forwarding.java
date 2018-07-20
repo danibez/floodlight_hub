@@ -643,7 +643,7 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 		        		String ipDst = ipv4.getDestinationAddress().toString();
 		        		hostPorts = topologyService.getPorts(sw.getId());
 //		        		setMaster(hostPorts, ipDst);
-		        		if(ipDst.compareTo("10.10.0.6") == 0) {// || (ipSrc.compareTo("10.10.0.2") == 0)) {
+		        		if((ipSrc.compareTo("10.10.0.1") == 0) || (ipSrc.compareTo("10.10.0.2") == 0)) {
 //			        		Set<OFPort> lol = new HashSet<OFPort>();
 			        		hostPorts = topologyService.getPorts(sw.getId());
 //		        			log.info("ipSrc: {}, destPort: {}", ipSrc, tcp.getDestinationPort().toString());
@@ -685,6 +685,7 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 		        				Set<OFPort> outPort = new HashSet<OFPort>();
 		        				outPort.add(OFPort.of(pout));
 //	        					pi = fixIpSrc(sw, pi.getData(),hostPorts, currentMaster);
+//		        				log.info("master: {}, ip: {}", masterPort, ipSrc);
 		        				packetOutMultiPort(pi, sw, OFPort.of(pin), currentMaster, outPort, cntx);
 //		        				doL2ForwardFlow(sw, pi, decision, cntx, false);
 //		        				log.info("master: {}, ip: {}", masterPort, ipSrc);
