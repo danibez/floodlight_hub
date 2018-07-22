@@ -407,7 +407,7 @@ public abstract class ForwardingBase implements IOFMessageListener {
             	actions.add(setNwDst);
             	actions.add(setDlSrc);
             	actions.add(setNwSrc);
-            	actions.add(setTcpSrc);
+//            	actions.add(setTcpSrc);
                 actions.add(sw.getOFFactory().actions().output(port, 0));
         	}
         	else{
@@ -468,7 +468,7 @@ public abstract class ForwardingBase implements IOFMessageListener {
             	actions.add(setNwDst);
             	actions.add(setDlSrc);
             	actions.add(setNwSrc);
-            	actions.add(setTcpDst);
+//            	actions.add(setTcpDst);
 	            actions.add(sw.getOFFactory().actions().output(OFPort.of(1), 0));
 	            break;
         	}
