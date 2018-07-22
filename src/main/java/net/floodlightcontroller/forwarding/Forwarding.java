@@ -115,6 +115,8 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 
 	private int currentMaster;
 
+	private TransportPort initialPort;
+
     protected static class FlowSetIdRegistry {
         private volatile Map<NodePortTuple, Set<U64>> nptToFlowSetIds;
         private volatile Map<U64, Set<NodePortTuple>> flowSetIdToNpts;
@@ -644,6 +646,8 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 		        		hostPorts = topologyService.getPorts(sw.getId());
 //		        		setMaster(hostPorts, ipDst);
 		        		if((ipSrc.compareTo("10.10.0.1") == 0) || (ipSrc.compareTo("10.10.0.2") == 0)) {
+		        			initialPort = tcp.getSourcePort();
+//		        			log.info("{}", initialPort.toString());
 //			        		Set<OFPort> lol = new HashSet<OFPort>();
 			        		hostPorts = topologyService.getPorts(sw.getId());
 //		        			log.info("ipSrc: {}, destPort: {}", ipSrc, tcp.getDestinationPort().toString());
@@ -651,7 +655,7 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 //		        			lol.add(OFPort.of(3));
 //			        		hostPorts.add(OFPort.of(5));
 			        		int p = getPortFromIp(ipSrc);
-		        			packetOutMultiPort(pi, sw, OFPort.of(p), 0, hostPorts, cntx);
+		        			packetOutMultiPort(pi, sw, OFPort.of(p), 0, hostPorts, initialPort, cntx);
 //			        		pushPacket(sw, pi, OFPort.of(3), true, cntx);
 //			        		pushPacket(sw, pi, OFPort.of(4), true, cntx);
 //			        		pushPacket(sw, pi, OFPort.of(5), true, cntx);
@@ -674,7 +678,7 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 //		        			boolean op = setMaster(hostPorts, ipSrc);
 		        			int pin = getPortFromIp(ipSrc);
 //		        			log.info("pin:{}, currentMaster:{}", pin, currentMaster);
-		        			log.info("{}",tcp.getDestinationPort().toString());
+//		        			log.info("{}",tcp.getDestinationPort().toString());
 		        			if(currentMaster == 0)
 		        				currentMaster = pin;
 		        			if (!isHostAlive())
@@ -687,16 +691,18 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 		        				outPort.add(OFPort.of(pout));
 //	        					pi = fixIpSrc(sw, pi.getData(),hostPorts, currentMaster);
 //		        				log.info("master: {}, ip: {}", masterPort, ipSrc);
-		        				packetOutMultiPort(pi, sw, OFPort.of(pin), currentMaster, outPort, cntx);
+		        				packetOutMultiPort(pi, sw, OFPort.of(pin), currentMaster, outPort, initialPort,cntx);
 //		        				doL2ForwardFlow(sw, pi, decision, cntx, false);
 //		        				log.info("master: {}, ip: {}", masterPort, ipSrc);
 //		        				packetOutMultiPort(pi, sw, OFPort.of(masterPort), hostPorts, cntx);
 		        			}
-//		        			else {
-//		        				doDropFlow(sw, pi, decision, cntx);
-//		        			}
+		        			else {
+		        				doDropFlow(sw, pi, decision, cntx);
+		        			}
 		        		}
 		        	}
+		        	else
+		        		doL2ForwardFlow(sw, pi, decision, cntx, false);
         		}
         		else
             		doL2ForwardFlow(sw, pi, decision, cntx, false);
@@ -1484,6 +1490,7 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
         this.linkService = context.getServiceImpl(ILinkDiscoveryService.class);
         this.masterPort = 0;
         this.currentMaster = 0;
+        this.initialPort = null;
 
         l3manager = new L3RoutingManager();
         l3cache = new ConcurrentHashMap<>();

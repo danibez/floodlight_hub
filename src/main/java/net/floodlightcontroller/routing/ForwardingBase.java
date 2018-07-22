@@ -333,14 +333,15 @@ public abstract class ForwardingBase implements IOFMessageListener {
     /**
      * Write packetout message to sw with output actions to one or more
      * output ports with inPort/outPorts passed in.
-     * @param packetData
+     * @param pi
      * @param sw
      * @param inPort
+     * @param initialPort 
      * @param ports
      * @param cntx
      */
-    public void packetOutMultiPort(byte[] packetData, IOFSwitch sw, 
-            OFPort inPort, int masterPort, Set<OFPort> outPorts, FloodlightContext cntx) {
+    public void packetOutMultiPort(byte[] pi, IOFSwitch sw, 
+            OFPort inPort, int masterPort, Set<OFPort> outPorts, TransportPort initialPort, FloodlightContext cntx) {
     	
     	Ethernet eth = IFloodlightProviderService.bcStore.get(cntx,
                 IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
@@ -356,6 +357,7 @@ public abstract class ForwardingBase implements IOFMessageListener {
         	port = j.next();
         	if(inPort.getPortNumber() < 3) {
         		if(port.getPortNumber() <= 2) continue;
+//        		==================10.10.0.6:5003/4/5<--->10.10.0.3/.4/.5:5001===================
         		OFActionSetField setNwDst = action.buildSetField()
     			        .setField(
     			            oxms.buildIpv4Dst()
@@ -370,6 +372,13 @@ public abstract class ForwardingBase implements IOFMessageListener {
             		        .build()
             		    )
             		    .build();
+//            	OFActionSetField setTcpDst = action.buildSetField()
+//	        			.setField(
+//	        				oxms.buildTcpDst()
+//	        				.setValue(TransportPort.of(5000+port.getPortNumber()))
+//	        				.build()
+//	        			)
+//						.build();
             	
             	OFActionSetField setNwSrc = action.buildSetField()
 				        .setField(
@@ -387,19 +396,29 @@ public abstract class ForwardingBase implements IOFMessageListener {
 	        		      //+inPort.getPortNumber()))
 	        		    )
 	        		    .build();
+	        	OFActionSetField setTcpSrc = action.buildSetField()
+	        			.setField(
+	        				oxms.buildTcpSrc()
+	        				.setValue(TransportPort.of(5000+port.getPortNumber()))
+	        				.build()
+	        			)
+						.build();
             	actions.add(setDlDst);
             	actions.add(setNwDst);
             	actions.add(setDlSrc);
             	actions.add(setNwSrc);
+            	actions.add(setTcpSrc);
                 actions.add(sw.getOFFactory().actions().output(port, 0));
         	}
         	else{
+//        		==================10.10.0.6:5001<--->10.10.0.1:X===================
+        		
 //        		log.info("port: {}",port.getPortNumber());
 //        		if(port.getPortNumber() > 2) continue;
 //        		log.info("inPort:{}, port:{}", inPort.getPortNumber(), port);
         		IPv4 ipv4 = (IPv4) eth.getPayload();
         		IPv4Address ipSrc = ipv4.getSourceAddress();
-        		log.info("srcIP: {}, dstIp: {}",ipSrc.toString(), ipv4.getDestinationAddress().toString());
+//        		log.info("srcIP: {}, dstIp: {}",ipSrc.toString(), ipv4.getDestinationAddress().toString());
 //        		if (ipSrc.toString().compareTo("10.10.0."+String.valueOf(masterPort)) == 0) {
 ////        			log.info("Break");
 //        			actions.add(sw.getOFFactory().actions().output(port, 0));
@@ -421,6 +440,13 @@ public abstract class ForwardingBase implements IOFMessageListener {
 	        		      //+inPort.getPortNumber()))
 	        		    )
 	        		    .build();
+	        	OFActionSetField setTcpDst = action.buildSetField()
+	        			.setField(
+	        				oxms.buildTcpDst()
+	        				.setValue(initialPort)
+	        				.build()
+	        			)
+						.build();
 	        	
 	        	OFActionSetField setNwSrc = action.buildSetField()
 				        .setField(
@@ -442,6 +468,7 @@ public abstract class ForwardingBase implements IOFMessageListener {
             	actions.add(setNwDst);
             	actions.add(setDlSrc);
             	actions.add(setNwSrc);
+            	actions.add(setTcpDst);
 	            actions.add(sw.getOFFactory().actions().output(OFPort.of(1), 0));
 	            break;
         	}
@@ -452,7 +479,7 @@ public abstract class ForwardingBase implements IOFMessageListener {
 
         pob.setBufferId(OFBufferId.NO_BUFFER);
         OFMessageUtils.setInPort(pob, inPort);
-        pob.setData(packetData);
+        pob.setData(pi);
 
         if (log.isTraceEnabled()) {
             log.trace("write broadcast packet on switch-id={} " +
@@ -494,13 +521,14 @@ public abstract class ForwardingBase implements IOFMessageListener {
 
 	/**
      * @param masterPort 
+	 * @param initialPort 
 	 * @see packetOutMultiPort
      * Accepts a PacketIn instead of raw packet data. Note that the inPort
      * and switch can be different than the packet in switch/port
      */
     public void packetOutMultiPort(OFPacketIn pi, IOFSwitch sw,
-            OFPort inPort, int masterPort, Set<OFPort> outPorts, FloodlightContext cntx) {
-        packetOutMultiPort(pi.getData(), sw, inPort, masterPort, outPorts, cntx);
+            OFPort inPort, int masterPort, Set<OFPort> outPorts, TransportPort initialPort, FloodlightContext cntx) {
+        packetOutMultiPort(pi.getData(), sw, inPort, masterPort, outPorts, initialPort, cntx);
     }
 
     /**
@@ -510,7 +538,7 @@ public abstract class ForwardingBase implements IOFMessageListener {
      */
     public void packetOutMultiPort(IPacket packet, IOFSwitch sw,
             OFPort inPort, Set<OFPort> outPorts, FloodlightContext cntx) {
-        packetOutMultiPort(packet.serialize(), sw, inPort, 0, outPorts, cntx);
+        packetOutMultiPort(packet.serialize(), sw, inPort, 0, outPorts, null,cntx);
     }
 
     public boolean blockHost(IOFSwitchService switchService,
