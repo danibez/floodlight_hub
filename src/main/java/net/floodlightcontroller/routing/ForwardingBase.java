@@ -354,9 +354,9 @@ public abstract class ForwardingBase implements IOFMessageListener {
         OFPort port;
         while (j.hasNext()) {
         	port = j.next();
-//        	log.info("inPort:{}, port:{}", inPort.getPortNumber(), port);
         	if(inPort.getPortNumber() < 3) {
         		if(port.getPortNumber() <= 2) continue;
+//        		==================10.10.0.6:5003/4/5<--->10.10.0.3/.4/.5:5001===================
         		OFActionSetField setNwDst = action.buildSetField()
     			        .setField(
     			            oxms.buildIpv4Dst()
@@ -371,39 +371,104 @@ public abstract class ForwardingBase implements IOFMessageListener {
             		        .build()
             		    )
             		    .build();
+//            	OFActionSetField setTcpDst = action.buildSetField()
+//	        			.setField(
+//	        				oxms.buildTcpDst()
+//	        				.setValue(TransportPort.of(5000+port.getPortNumber()))
+//	        				.build()
+//	        			)
+//						.build();
+            	
+            	OFActionSetField setNwSrc = action.buildSetField()
+				        .setField(
+				            oxms.buildIpv4Src()
+				            .setValue(IPv4Address.of("10.10.0.6"))
+				            .build()
+				          //+inPort.getPortNumber()))
+				        )
+				        .build();
+	        	OFActionSetField setDlSrc = action.buildSetField()
+	        		    .setField(
+	        		        oxms.buildEthSrc()
+	        		        .setValue(MacAddress.of("12:34:56:78:90:12"))
+	        		        .build()
+	        		      //+inPort.getPortNumber()))
+	        		    )
+	        		    .build();
+	        	OFActionSetField setTcpSrc = action.buildSetField()
+	        			.setField(
+	        				oxms.buildTcpSrc()
+	        				.setValue(TransportPort.of(5000+port.getPortNumber()))
+	        				.build()
+	        			)
+						.build();
             	actions.add(setDlDst);
             	actions.add(setNwDst);
+            	actions.add(setDlSrc);
+            	actions.add(setNwSrc);
+//            	actions.add(setTcpSrc);
                 actions.add(sw.getOFFactory().actions().output(port, 0));
         	}
         	else{
-        		if(port.getPortNumber() > 2) continue;
+//        		==================10.10.0.6:5001<--->10.10.0.1:X===================
+        		
+//        		log.info("port: {}",port.getPortNumber());
+//        		if(port.getPortNumber() > 2) continue;
+//        		log.info("inPort:{}, port:{}", inPort.getPortNumber(), port);
         		IPv4 ipv4 = (IPv4) eth.getPayload();
         		IPv4Address ipSrc = ipv4.getSourceAddress();
-        		log.info("{}",ipSrc.toString());
-        		if (ipSrc.toString().compareTo("10.10.0."+String.valueOf(masterPort)) == 0) {
-        			log.info("Break");
-        			actions.add(sw.getOFFactory().actions().output(port, 0));
-        			break;
-        		}
+//        		log.info("srcIP: {}, dstIp: {}",ipSrc.toString(), ipv4.getDestinationAddress().toString());
+//        		if (ipSrc.toString().compareTo("10.10.0."+String.valueOf(masterPort)) == 0) {
+////        			log.info("Break");
+//        			actions.add(sw.getOFFactory().actions().output(port, 0));
+//        			break;
+//        		}
 	        	OFActionSetField setNwDst = action.buildSetField()
 				        .setField(
-				            oxms.buildIpv4Src()
-				            .setValue(IPv4Address.of("10.10.0."+String.valueOf(inPort.getPortNumber())))
+				            oxms.buildIpv4Dst()
+				            .setValue(IPv4Address.of("10.10.0.1"))
 				            .build()
 				          //+inPort.getPortNumber()))
 				        )
 				        .build();
 	        	OFActionSetField setDlDst = action.buildSetField()
 	        		    .setField(
+	        		        oxms.buildEthDst()
+	        		        .setValue(MacAddress.of("00:00:00:00:00:01"))//12:34:56:78:90:12
+	        		        .build()
+	        		      //+inPort.getPortNumber()))
+	        		    )
+	        		    .build();
+//	        	OFActionSetField setTcpDst = action.buildSetField()
+//	        			.setField(
+//	        				oxms.buildTcpDst()
+//	        				.setValue(initialPort)
+//	        				.build()
+//	        			)
+//						.build();
+	        	
+	        	OFActionSetField setNwSrc = action.buildSetField()
+				        .setField(
+				            oxms.buildIpv4Src()
+				            .setValue(IPv4Address.of("10.10.0.6"))
+				            .build()
+				          //+inPort.getPortNumber()))
+				        )
+				        .build();
+	        	OFActionSetField setDlSrc = action.buildSetField()
+	        		    .setField(
 	        		        oxms.buildEthSrc()
-	        		        .setValue(MacAddress.of("00:00:00:00:00:0"+String.valueOf(inPort.getPortNumber())))
+	        		        .setValue(MacAddress.of("12:34:56:78:90:12"))
 	        		        .build()
 	        		      //+inPort.getPortNumber()))
 	        		    )
 	        		    .build();
 	        	actions.add(setDlDst);
-	        	actions.add(setNwDst);
-	            actions.add(sw.getOFFactory().actions().output(port, 0));
+            	actions.add(setNwDst);
+            	actions.add(setDlSrc);
+            	actions.add(setNwSrc);
+//            	actions.add(setTcpDst);
+	            actions.add(sw.getOFFactory().actions().output(OFPort.of(1), 0));
 	            break;
         	}
         }
