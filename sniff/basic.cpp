@@ -16,89 +16,94 @@ using namespace std;
 map<int, string> portMap;
 
 
-class Client()
+class Client
 {
 	string ipAddress;
 	string user;
+	amqp_connection_state_t *connPub = NULL;
+	amqp_connection_state_t *connSub = NULL;
 };
 
 
-// void PublishRabbitMQ()
-// {
-// 	std_msgs::Float64 msg;
-// 	msg.data = message;
-// 	amqp_basic_properties_t props;
-// 	props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_DELIVERY_MODE_FLAG;
-// 	props.content_type = amqp_cstring_bytes("text/plain");
-// 	props.delivery_mode = 2; /* persistent delivery mode */
+void PublishRabbitMQ()
+{
+	std_msgs::Float64 msg;
+	msg.data = message;
+	amqp_basic_properties_t props;
+	props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_DELIVERY_MODE_FLAG;
+	props.content_type = amqp_cstring_bytes("text/plain");
+	props.delivery_mode = 2; /* persistent delivery mode */
 
-// 	// ================================================================================
-// 	namespace ser = ros::serialization;
-// 	size_t serial_size = ros::serialization::serializationLength(msg);
-// 	boost::shared_array<uint8_t> buffer(new uint8_t[serial_size]);
+	// ================================================================================
+	namespace ser = ros::serialization;
+	size_t serial_size = ros::serialization::serializationLength(msg);
+	boost::shared_array<uint8_t> buffer(new uint8_t[serial_size]);
 
-// 	ser::OStream stream(buffer.get(), serial_size);
-// 	ser::serialize(stream, msg);
+	ser::OStream stream(buffer.get(), serial_size);
+	ser::serialize(stream, msg);
 
-// 	std::string s(buffer.get(), buffer.get()+serial_size);
+	std::string s(buffer.get(), buffer.get()+serial_size);
 
-// 	amqp_bytes_t data;
-// 	data.len = serial_size;
-// 	data.bytes = (void*)s.data();
-// 	// ================================================================================
+	amqp_bytes_t data;
+	data.len = serial_size;
+	data.bytes = (void*)s.data();
+	// ================================================================================
 
-// 	die_on_error(amqp_basic_publish(*conn,
-// 									1,
-// 									amqp_cstring_bytes(exchange),
-// 									amqp_cstring_bytes(queue),
-// 									0,
-// 									0,
-// 									&props,
-// 									data),
-// 				"Publishing");
-// }
+	die_on_error(amqp_basic_publish(*conn,
+									1,
+									amqp_cstring_bytes(exchange),
+									amqp_cstring_bytes(queue),
+									0,
+									0,
+									&props,
+									data),
+				"Publishing");
+}
 
 
-// void connect_to_broker()
-// {
-// 	amqp_socket_t *socket = NULL;
-// 	int status;
+void amqp_new_connection(amqp_connection_state_t *conn, const char* exchange, bool declare_queue)
+{
+	amqp_socket_t *socket = NULL;
+	int status;
 
-// 	socket = amqp_tcp_socket_new(*conn);
-// 	if (!socket) {
-// 		die("creating TCP socket");
-// 	}
+	socket = amqp_tcp_socket_new(*conn);
+	if (!socket) {
+		die("creating TCP socket");
+	}
 
-// 	status = amqp_socket_open(socket, (cli->ipAddress).c_str(), 5672);
-// 	if (status) {
-// 		die("opening TCP socket");
-// 	}
+	status = amqp_socket_open(socket, (cli->ipAddress).c_str(), 5672);
+	if (status) {
+		die("opening TCP socket");
+	}
+}
 
-// 	die_on_amqp_error(amqp_login(*conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, cli->user.c_str(), cli->user.c_str()),
-// 	                "Logging in");
-// 	amqp_channel_open(*conn, 1);
-// 	die_on_amqp_error(amqp_get_rpc_reply(*conn), "Opening channel");
+void amqp_declare_exchange(amqp_connection_state_t *conn, const char* exchange, bool declare_queue)
+{
+	die_on_amqp_error(amqp_login(*conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, cli->user.c_str(), cli->user.c_str()),
+	                "Logging in");
+	amqp_channel_open(*conn, 1);
+	die_on_amqp_error(amqp_get_rpc_reply(*conn), "Opening channel");
 
-// 	amqp_exchange_declare(*conn, 1, amqp_cstring_bytes(exchange), amqp_cstring_bytes("topic"),
-// 	                  0, 0, 0, 0, amqp_empty_table);
-// 	die_on_amqp_error(amqp_get_rpc_reply(*conn), "Declaring exchange");
+	amqp_exchange_declare(*conn, 1, amqp_cstring_bytes(exchange), amqp_cstring_bytes("topic"),
+	                  0, 0, 0, 0, amqp_empty_table);
+	die_on_amqp_error(amqp_get_rpc_reply(*conn), "Declaring exchange");
+}
 
-// 	if (queue)
-// 	{
-// 		amqp_bytes_t queuename = amqp_cstring_bytes(queue);
-// 		amqp_queue_declare_ok_t *r = amqp_queue_declare(*conn, 1, queuename, 0, 0, 0, 0,
-// 		                             amqp_empty_table);
-// 		die_on_amqp_error(amqp_get_rpc_reply(*conn), "Declaring queue");
-// 		queuename = amqp_bytes_malloc_dup(r->queue);
-// 		if (queuename.bytes == NULL) {
-// 			fprintf(stderr, "Out of memory while copying queue name");
-// 		}
+void amqp_declare_queue()
+{
+	amqp_bytes_t queuename = amqp_cstring_bytes(queue);
+	amqp_queue_declare_ok_t *r = amqp_queue_declare(*conn, 1, queuename, 0, 0, 0, 0,
+	                             amqp_empty_table);
+	die_on_amqp_error(amqp_get_rpc_reply(*conn), "Declaring queue");
+	queuename = amqp_bytes_malloc_dup(r->queue);
+	if (queuename.bytes == NULL) {
+		fprintf(stderr, "Out of memory while copying queue name");
+	}
 
-// 		amqp_queue_bind(*conn, 1, queuename, amqp_cstring_bytes(exchange), amqp_cstring_bytes(queue),
-// 		                amqp_empty_table);
-// 		die_on_amqp_error(amqp_get_rpc_reply(*conn), "Binding queue");
-// 	}
-// }
+	amqp_queue_bind(*conn, 1, queuename, amqp_cstring_bytes(exchange), amqp_cstring_bytes(queue),
+	                amqp_empty_table);
+	die_on_amqp_error(amqp_get_rpc_reply(*conn), "Binding queue");
+}
 
 // bool isPublish()
 // {
@@ -117,6 +122,7 @@ class Client()
 
 Client getClientFromMap()
 {
+
 	return client;
 }
 
@@ -127,6 +133,7 @@ Client getClientFromMap()
 
 void processAmqpPacket(RawPDU::payload_type payload)
 {
+	operations = ;
 	string message( payload.begin(), payload.end() );
 
 	const char *msg = message.c_str();
@@ -160,6 +167,7 @@ void processAmqpPacket(RawPDU::payload_type payload)
 	{
 		cout << "Basic Consume\n";
 	}
+	return operations;
 }
 
 bool count_packets(PDU &temp) {
@@ -171,16 +179,15 @@ bool count_packets(PDU &temp) {
 		if(tcp.dport() == 5672){
 			const RawPDU &raw = temp.rfind_pdu<RawPDU>();
 			const RawPDU::payload_type& payload = raw.payload();
-	    	
+	    	processAmqpPacket(payload);
     		if(!isConnected(clientIp, tcp))
     		{
     			Client cli = new client();
-    			cli->connection = amqp_new_connection();
+    			cli->connPub = amqp_new_connection();
+    			amqp_new_connection(&cli->connPub, "joint_state_sub");
     			connect_to_broker();
     			addClientToMap(clientIp, tcp);
     		}
-    		
-    		processAmqpPacket(payload);
 
 	    	// 	if(isToPublish())
 	    	// 	{
