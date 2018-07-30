@@ -632,76 +632,78 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
         	IPacket pkt = eth.getPayload();
         	if (pkt instanceof IPv4)
         	{
-        		IPv4 ipv4 = (IPv4) eth.getPayload();
-        		if (ipv4.getProtocol() == IpProtocol.TCP) {
-		        	TCP tcp = (TCP) ipv4.getPayload();
-		        	int result = 0;
-		        	if((tcp.getDestinationPort().toString().compareTo("5672") == 0) || (tcp.getDestinationPort().toString().compareTo("5001") == 0))
-		        	{
-//		        		ipv4.setDestinationAddress(destinationAddress)
-		        		ipSrc = ipv4.getSourceAddress().toString();
-		        		if((ipSrc.compareTo("10.10.0.1") == 0) || (ipSrc.compareTo("10.10.0.2") == 0)) {
-			        		Set<OFPort> hostPorts = new HashSet<OFPort>();
-//			        		hostPorts = topologyService.getPorts(sw.getId());
-//			        		hostPorts.add(OFPort.of(4));
+//        		IPv4 ipv4 = (IPv4) eth.getPayload();
+//        		if (ipv4.getProtocol() == IpProtocol.TCP) {
+//		        	TCP tcp = (TCP) ipv4.getPayload();
+//		        	int result = 0;
+//		        	if((tcp.getDestinationPort().toString().compareTo("5672") == 0) || (tcp.getDestinationPort().toString().compareTo("5001") == 0))
+//		        	{
+////		        		ipv4.setDestinationAddress(destinationAddress)
+//		        		ipSrc = ipv4.getSourceAddress().toString();
+////		        		log.info("{} -> {}", ipSrc, ipv4.getDestinationAddress().toString());
+//		        		if((ipSrc.compareTo("10.10.0.1") == 0) || (ipSrc.compareTo("10.10.0.2") == 0)) {
+//			        		Set<OFPort> hostPorts = new HashSet<OFPort>();
+////			        		hostPorts = topologyService.getPorts(sw.getId());
+////			        		hostPorts.add(OFPort.of(4));
+////			        		hostPorts.add(OFPort.of(3));
+////			        		hostPorts.add(OFPort.of(5));
+//			        		int temp = tcp.getSourcePort().getPort();
+//			        		result = (temp % 3)+3;
+//			        		int p = getPortFromIp(ipSrc);
+//			        		if(flowMap.get(result) == null)
+//			        		{
+//			        			OFPort[] tempVet = new OFPort[2];
+//			        			tempVet[0] = OFPort.of(p);
+//			        			tempVet[1] = OFPort.of(result);
+//			        			flowMap.put(temp, tempVet);
+//			        		}
+////			        		log.info("out:{}, port:{}",result, temp);
+////			        		hostPorts.add(OFPort.of(result));
 //			        		hostPorts.add(OFPort.of(3));
-//			        		hostPorts.add(OFPort.of(5));
-			        		int temp = tcp.getSourcePort().getPort();
-			        		result = (tcp.getSourcePort().getPort() % 3)+3;
-			        		int p = getPortFromIp(ipSrc);
-			        		if(flowMap.get(result) == null)
-			        		{
-			        			OFPort[] tempVet = new OFPort[2];
-			        			tempVet[0] = OFPort.of(p);
-			        			tempVet[1] = OFPort.of(result);
-			        			flowMap.put(temp, tempVet);
-			        		}
-			        		log.info("out:{}, port:{}",result, temp);
-			        		hostPorts.add(OFPort.of(result));
-		        			packetOutMultiPort(pi, sw, OFPort.of(p), masterPort, hostPorts, cntx);
-//			        		pushPacket(sw, pi, OFPort.of(result+1), true, cntx);
-//			        		pushPacket(sw, pi, OFPort.of(4), true, cntx);
-//			        		pushPacket(sw, pi, OFPort.of(5), true, cntx);
-	//		        		pi = analyzePacketIn(sw, ipv4, tcp, eth, pi,cntx);
-	//		        		doL2ForwardFlow(sw, pi, decision, cntx, false);
-		        			
-		        		}
-		        		else
-		        			doL2ForwardFlow(sw, pi, decision, cntx, false);
-		        	}
-		        	else if((tcp.getSourcePort().toString().compareTo("5672") == 0) || (tcp.getSourcePort().toString().compareTo("5001") == 0)) {
-		        		ipSrc = ipv4.getSourceAddress().toString();
-		        		if ((ipSrc.compareTo("10.10.0.3") == 0) || (ipSrc.compareTo("10.10.0.4") == 0) || (ipSrc.compareTo("10.10.0.5") == 0)) {
+//		        			packetOutMultiPort(pi, sw, OFPort.of(p), masterPort, hostPorts, cntx);
+////			        		pushPacket(sw, pi, OFPort.of(result+1), true, cntx);
+////			        		pushPacket(sw, pi, OFPort.of(4), true, cntx);
+////			        		pushPacket(sw, pi, OFPort.of(5), true, cntx);
+//	//		        		pi = analyzePacketIn(sw, ipv4, tcp, eth, pi,cntx);
+//	//		        		doL2ForwardFlow(sw, pi, decision, cntx, false);
+//		        			
+//		        		}
+//		        		else
 //		        			doL2ForwardFlow(sw, pi, decision, cntx, false);
-//		        			Set<OFPort> hostPorts = new HashSet<OFPort>();
-//		        			hostPorts.add(OFPort.of(1));
-		        			hostPorts = topologyService.getPorts(sw.getId());
-//		        			if(masterPort == 0)
-		        			boolean op = setMaster(hostPorts, ipSrc);        			
-//		        			if(op) {
-//		        				ipSrc = ipv4.toIPv4Address("10.10.0."+String.valueOf(currentMaster));
-		        				String ipDst = ipv4.getDestinationAddress().toString();
-		        				int pin = currentMaster;
-		        				int pout = getPortFromIp(ipDst);
-		        				Set<OFPort> outPort = new HashSet<OFPort>();
-//		        				flowMap.get(key).
-		        				outPort.add(OFPort.of(1));
-//	        					pi = fixIpSrc(sw, pi.getData(),hostPorts, currentMaster);
-		        				log.info("master: {}, ip: {}", pin, ipSrc);
-//		        				result = (tcp.getDestinationPort().getPort() % 3);
-//		        				pushPacket(sw, pi, flowMap.get(tcp.getDestinationPort()), true, cntx);
-		        				packetOutMultiPort(pi, sw, OFPort.of(pout), masterPort, outPort, cntx);
-//		        				doL2ForwardFlow(sw, pi, decision, cntx, false);
-//		        				log.info("master: {}, ip: {}", masterPort, ipSrc);
-//		        				packetOutMultiPort(pi, sw, OFPort.of(masterPort), hostPorts, cntx);
-//		        			}
-//		        			else {
-//		        				doDropFlow(sw, pi, decision, cntx);
-//		        			}
-		        		}
-		        	}
-        		}
-        		else
+//		        	}
+//		        	else if((tcp.getSourcePort().toString().compareTo("5672") == 0) || (tcp.getSourcePort().toString().compareTo("5001") == 0)) {
+//		        		ipSrc = ipv4.getSourceAddress().toString();
+//		        		if ((ipSrc.compareTo("10.10.0.3") == 0) || (ipSrc.compareTo("10.10.0.4") == 0) || (ipSrc.compareTo("10.10.0.5") == 0)) {
+////		        			doL2ForwardFlow(sw, pi, decision, cntx, false);
+////		        			Set<OFPort> hostPorts = new HashSet<OFPort>();
+////		        			hostPorts.add(OFPort.of(1));
+//		        			hostPorts = topologyService.getPorts(sw.getId());
+////		        			if(masterPort == 0)
+//		        			boolean op = setMaster(hostPorts, ipSrc);        			
+////		        			if(op) {
+////		        				ipSrc = ipv4.toIPv4Address("10.10.0."+String.valueOf(currentMaster));
+//		        				String ipDst = ipv4.getDestinationAddress().toString();
+//		        				int pin = currentMaster;
+//		        				int pout = getPortFromIp(ipDst);
+//		        				Set<OFPort> outPort = new HashSet<OFPort>();
+////		        				flowMap.get(key).
+//		        				outPort.add(OFPort.of(1));
+////	        					pi = fixIpSrc(sw, pi.getData(),hostPorts, currentMaster);
+////		        				log.info("master: {}, ip: {}", pin, ipSrc);
+////		        				result = (tcp.getDestinationPort().getPort() % 3);
+////		        				pushPacket(sw, pi, flowMap.get(tcp.getDestinationPort()), true, cntx);
+//		        				packetOutMultiPort(pi, sw, OFPort.of(pout), masterPort, outPort, cntx);
+////		        				doL2ForwardFlow(sw, pi, decision, cntx, false);
+////		        				log.info("master: {}, ip: {}", masterPort, ipSrc);
+////		        				packetOutMultiPort(pi, sw, OFPort.of(masterPort), hostPorts, cntx);
+////		        			}
+////		        			else {
+////		        				doDropFlow(sw, pi, decision, cntx);
+////		        			}
+//		        		}
+//		        	}
+//        		}
+//        		else
             		doL2ForwardFlow(sw, pi, decision, cntx, false);
         	}
         	else
