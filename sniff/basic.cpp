@@ -136,12 +136,13 @@ int processAmqpPacket(RawPDU::payload_type payload)
 	int operations = -1;
 	string message( payload.begin(), payload.end() );
 
-	const char *msg = message.c_str();
+	// const char *msg = message.c_str();
 	stringstream result;
 	result << std::setw(2) << std::setfill('0') << std::hex << std::uppercase;
 	std::copy(message.begin(), message.end(), std::ostream_iterator<unsigned int>(result));
 	string temp(result.str());
 	size_t found;
+	// cout << message << endl;
 
 	found = temp.find("0140A");//Connect AMQP
 	if(found != string::npos)
@@ -154,12 +155,46 @@ int processAmqpPacket(RawPDU::payload_type payload)
 		found = temp.find("0280A");//Exchange Declare
 		if(found != string::npos)
 		{
+			// cout << found << endl;
 			cout << "Exchange Declare\n";
 			// "746F706963"
-			found = found+5+3;//0280A + 3 Bytes
-			operations = 1;
-			cout << temp << endl;
-			cout << message << endl;
+			found = found+8;//0280A + 00 == size_value
+			int size;
+			std::stringstream ss;
+			string sizeVal = temp[found-1];
+			if (sizeVal == '1')
+				sizeVal += temp[found];
+			ss << std::hex << sizeVal;
+			ss >> size;
+			std::cout << static_cast<int>(size) << std::endl;
+			// int size = lexical_cast<int>temp[found+3-1];
+			string exchange_name (message, found, size);
+
+
+
+			// string exchange_name (test.begin(), test.begin()+found);
+			// // string test2 (temp, found+3, size);
+			// found = test.find("topic");
+			// operations = 1;
+			// cout << test << endl;
+			// cout << test2 << endl;
+			// if(found != string::npos)
+			// {
+			// 	// cout << found << endl;
+				
+			// 	string exchange_type ("topic");
+			// 	cout << exchange_name << endl;
+			// }
+			// else
+			// {
+			// 	found = test.find("direct");
+			// 	if(found != string::npos)
+			// 	{
+			// 		string exchange_name (test.begin(), test.begin()+found);
+			// 		string exchange_type ("direct");
+			// 		cout << exchange_name << endl;
+			// 	}
+			// }
 
 		}
 		else{
@@ -167,24 +202,42 @@ int processAmqpPacket(RawPDU::payload_type payload)
 			if(found != string::npos)
 			{
 				cout << "Queue Declare\n";
+				found = found+5;//0320A
+				string test (message, found);
 				operations = 2;
 				cout << temp << endl;
+				cout << test << endl;
+				size_t found2 = temp.find("00000");
+				if(found2 != string::npos)
+				{
+					string chars (message, found, found2-found);
+
+					// string queue_name (test.begin(), test.begin()+found);
+					cout << message.size() << endl;
+					cout << test << endl;
+				}
 			}
 			else{
 				found = temp.find("032014");//Queue Bind
 				if(found != string::npos)
 				{
 					cout << "Queue Bind\n";
+					found = found+6;//0280A + 3 Bytes
+					string test (message, found);
 					operations = 3;
 					cout << temp << endl;
+					cout << test << endl;
 				}
 				else{
 					found = temp.find("03C014");//Basic Consume
 					if(found != string::npos)
 					{
 						cout << "Basic Consume\n";
+						found = found+6;//0280A + 3 Bytes
+						string test (message, found);
 						operations = 4;
 						cout << temp << endl;
+						cout << test << endl;
 					}
 				}
 			}
