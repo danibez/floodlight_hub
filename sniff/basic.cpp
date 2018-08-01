@@ -131,7 +131,7 @@ map<int, string> portMap;
 // 	portMap.insert(pair<int,string>(ip+":"+to_string(clientPort),topic) );
 // }
 
-int processAmqpPacket(RawPDU::payload_type payload)
+void processAmqpPacket(RawPDU::payload_type payload)
 {
 	int operations = -1;
 	string message( payload.begin(), payload.end() );
@@ -147,115 +147,186 @@ int processAmqpPacket(RawPDU::payload_type payload)
 	found = temp.find("0140A");//Connect AMQP
 	if(found != string::npos)
 	{
-		cout << "AMQP New Connection\n";
+		// cout << ">>>>>AMQP New Connection\n";
 		operations = 0;
-		cout << temp << endl;
+		// cout << temp << endl;
 	}
 	else{
 		found = temp.find("0280A");//Exchange Declare
 		if(found != string::npos)
 		{
-			// cout << found << endl;
-			cout << "Exchange Declare\n";
-			// "746F706963"
-			found = found+8;//0280A + 00 == size_value
+			int sizeTemp = found + 8;
+			found = message.rfind("(");
+			found += 6;
+			// for (int i = 0; i < message.length(); i++)
+			// cout << ">>>>>Exchange Declare\n";
+
 			int size;
 			std::stringstream ss;
-			string sizeVal = temp[found-1];
-			if (sizeVal == '1')
-				sizeVal += temp[found];
+			string sizeVal (temp, sizeTemp-1, 1);
+			if (sizeVal.compare("1") == 0)
+			{
+				sizeTemp++;
+				sizeVal += temp[sizeTemp-1];
+			}
 			ss << std::hex << sizeVal;
 			ss >> size;
-			std::cout << static_cast<int>(size) << std::endl;
-			// int size = lexical_cast<int>temp[found+3-1];
+
 			string exchange_name (message, found, size);
+			// cout << exchange_name << endl;
 
 
 
-			// string exchange_name (test.begin(), test.begin()+found);
-			// // string test2 (temp, found+3, size);
-			// found = test.find("topic");
-			// operations = 1;
-			// cout << test << endl;
-			// cout << test2 << endl;
-			// if(found != string::npos)
-			// {
-			// 	// cout << found << endl;
-				
-			// 	string exchange_type ("topic");
-			// 	cout << exchange_name << endl;
-			// }
-			// else
-			// {
-			// 	found = test.find("direct");
-			// 	if(found != string::npos)
-			// 	{
-			// 		string exchange_name (test.begin(), test.begin()+found);
-			// 		string exchange_type ("direct");
-			// 		cout << exchange_name << endl;
-			// 	}
-			// }
 
+			found += size+1;
+			sizeTemp += size*2;
+			char c = temp[sizeTemp];
+
+			std::stringstream ss2;
+			string sizeVal2 (temp, sizeTemp, 1);
+			if (sizeVal2.compare("1") == 0)
+				sizeVal2 += temp[sizeTemp+1];
+			ss2 << std::hex << sizeVal2;
+			ss2 >> size;
+
+			string exchange_type(message, found, size);
+			// cout << exchange_type << endl;
 		}
 		else{
 			found = temp.find("0320A");//Queue Declare
 			if(found != string::npos)
 			{
-				cout << "Queue Declare\n";
-				found = found+5;//0320A
-				string test (message, found);
-				operations = 2;
-				cout << temp << endl;
-				cout << test << endl;
-				size_t found2 = temp.find("00000");
-				if(found2 != string::npos)
-				{
-					string chars (message, found, found2-found);
+				// cout << ">>>>>Queue Declare\n";
+				int sizeTemp = found + 8;
+				found = message.find("2");
+				found += 6;
 
-					// string queue_name (test.begin(), test.begin()+found);
-					cout << message.size() << endl;
-					cout << test << endl;
+				int size;
+				std::stringstream ss;
+				string sizeVal (temp, sizeTemp-1, 1);
+				if ((sizeVal.compare("1") == 0) || (sizeVal.compare("2") == 0))
+				{
+					sizeTemp++;
+					sizeVal += temp[sizeTemp-1];
 				}
+				ss << std::hex << sizeVal;
+				ss >> size;
+
+				string queue_name (message, found, size);
+				// cout << queue_name << endl;
 			}
 			else{
 				found = temp.find("032014");//Queue Bind
 				if(found != string::npos)
 				{
-					cout << "Queue Bind\n";
-					found = found+6;//0280A + 3 Bytes
-					string test (message, found);
-					operations = 3;
-					cout << temp << endl;
-					cout << test << endl;
+
+					// cout << ">>>>>Queue Bind\n";
+					int sizeTemp = found + 9;
+					found = message.find("2");
+					found += 6;
+
+					// cout << found << " " << sizeTemp << endl;
+					// cout << message << endl;
+					// cout << temp << endl;
+
+					int size;
+					std::stringstream ss;
+					string sizeVal (temp, sizeTemp-1, 1);
+					if ((sizeVal.compare("1") == 0) || (sizeVal.compare("2") == 0))
+					{
+						sizeTemp++;
+						sizeVal += temp[sizeTemp-1];
+					}
+					ss << std::hex << sizeVal;
+					ss >> size;
+
+					string queue_name (message, found, size);
+					// cout << queue_name << endl;
+
+
+
+					found += size+1;
+					sizeTemp += size*2;
+					char c = temp[sizeTemp];
+
+					std::stringstream ss2;
+					string sizeVal2 (temp, sizeTemp, 1);
+					if ((sizeVal2.compare("1") == 0))// || (sizeVal2.compare("2") == 0))
+					{
+						sizeTemp++;
+						sizeVal2 += temp[sizeTemp-1];
+					}
+					ss2 << std::hex << sizeVal2;
+					ss2 >> size;
+					// cout << c << endl; 
+
+					string exchange_name(message, found, size);
+					// cout << exchange_name << endl;
+
+
+
+					found += size+1;
+					sizeTemp += (size*2)+1;
+					c = temp[sizeTemp];
+					// cout << c << ' ' << temp[sizeTemp+1] << endl;
+
+					std::stringstream ss3;
+					string sizeVal3 (temp, sizeTemp, 1);
+					if ((sizeVal3.compare("1") == 0) || (sizeVal3.compare("2") == 0))
+					{
+						sizeTemp++;
+						sizeVal3 += temp[sizeTemp];
+					}
+					ss3 << std::hex << sizeVal3;
+					ss3 >> size;
+					// cout << c << " " << sizeVal3 << ' ' << size << endl; 
+
+					string routing_key(message, found, size);
+					// cout << routing_key << endl;
 				}
 				else{
 					found = temp.find("03C014");//Basic Consume
 					if(found != string::npos)
 					{
-						cout << "Basic Consume\n";
-						found = found+6;//0280A + 3 Bytes
-						string test (message, found);
-						operations = 4;
-						cout << temp << endl;
-						cout << test << endl;
+						// cout << ">>>>>Basic Consume\n";
+						int sizeTemp = found + 9;
+						found = message.find("<");
+						found += 6;
+
+						// cout << found << " " << sizeTemp << endl;
+						// cout << message << endl;
+						// cout << temp << endl;
+
+						int size;
+						std::stringstream ss;
+						string sizeVal (temp, sizeTemp-1, 1);
+						if ((sizeVal.compare("1") == 0) || (sizeVal.compare("2") == 0))
+						{
+							sizeTemp++;
+							sizeVal += temp[sizeTemp-1];
+						}
+						ss << std::hex << sizeVal;
+						ss >> size;
+
+						string basic_consume (message, found, size);
+						// cout << basic_consume << endl;
 					}
 				}
 			}
 		}
 	}
-	return operations;
 }
 
 bool count_packets(PDU &temp) {
 	const IP &ip = temp.rfind_pdu<IP>();
-	cout << "Src address: " << ip.src_addr() << endl;
+	// cout << "Src address: " << ip.src_addr() << endl;
 	string clientIp = ip.src_addr().to_string();
 	if((clientIp == "10.10.0.1") || (clientIp == "10.10.0.2")){
 		const TCP &tcp= temp.rfind_pdu<TCP>();
 		if(tcp.dport() == 5672){
 			const RawPDU &raw = temp.rfind_pdu<RawPDU>();
 			const RawPDU::payload_type& payload = raw.payload();
-	    	int op = processAmqpPacket(payload);
+	    	processAmqpPacket(payload);
     		// switch(op)
     		// {
     		// 	case 0:
@@ -287,7 +358,7 @@ bool count_packets(PDU &temp) {
 
 int main() {
  	// Sniffer("h3-eth0").sniff_loop(count_packets);
-    FileSniffer sniffer("/home/db/floodlight/sniff/trace_45.pcap");
+    FileSniffer sniffer("/home/db/floodlight/sniff/trace.pcap");
     sniffer.sniff_loop(count_packets);
     // =============================================================
     // // Sniff on the provided interface in promiscuos mode
