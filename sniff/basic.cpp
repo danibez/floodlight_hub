@@ -61,7 +61,7 @@ map<int, string> portMap;
 // }
 
 
-// void amqp_new_connection(amqp_connection_state_t *conn, const char* exchange, bool declare_queue)
+// void amqp_connect(amqp_connection_state_t *conn, const char* exchange, bool declare_queue)
 // {
 // 	amqp_socket_t *socket = NULL;
 // 	int status;
@@ -131,7 +131,7 @@ map<int, string> portMap;
 // 	portMap.insert(pair<int,string>(ip+":"+to_string(clientPort),topic) );
 // }
 
-void processAmqpPacket(RawPDU::payload_type payload)
+int processAmqpPacket(RawPDU::payload_type payload, Client cli)
 {
 	int operations = -1;
 	string message( payload.begin(), payload.end() );
@@ -155,6 +155,7 @@ void processAmqpPacket(RawPDU::payload_type payload)
 		found = temp.find("0280A");//Exchange Declare
 		if(found != string::npos)
 		{
+			operations = 1;
 			int sizeTemp = found + 8;
 			found = message.rfind("(");
 			found += 6;
@@ -196,6 +197,7 @@ void processAmqpPacket(RawPDU::payload_type payload)
 			found = temp.find("0320A");//Queue Declare
 			if(found != string::npos)
 			{
+				operations = 2;
 				// cout << ">>>>>Queue Declare\n";
 				int sizeTemp = found + 8;
 				found = message.find("2");
@@ -219,7 +221,7 @@ void processAmqpPacket(RawPDU::payload_type payload)
 				found = temp.find("032014");//Queue Bind
 				if(found != string::npos)
 				{
-
+					operations = 3;
 					// cout << ">>>>>Queue Bind\n";
 					int sizeTemp = found + 9;
 					found = message.find("2");
@@ -288,6 +290,7 @@ void processAmqpPacket(RawPDU::payload_type payload)
 					found = temp.find("03C014");//Basic Consume
 					if(found != string::npos)
 					{
+						operations = 4;
 						// cout << ">>>>>Basic Consume\n";
 						int sizeTemp = found + 9;
 						found = message.find("<");
@@ -315,6 +318,7 @@ void processAmqpPacket(RawPDU::payload_type payload)
 			}
 		}
 	}
+	return operations;
 }
 
 bool count_packets(PDU &temp) {
@@ -326,30 +330,31 @@ bool count_packets(PDU &temp) {
 		if(tcp.dport() == 5672){
 			const RawPDU &raw = temp.rfind_pdu<RawPDU>();
 			const RawPDU::payload_type& payload = raw.payload();
-	    	processAmqpPacket(payload);
-    		// switch(op)
-    		// {
-    		// 	case 0:
-	    	// 		Client cli = new client();
-	    	// 		cli->connPub = amqp_new_connection();
-	    	// 		amqp_new_connection(&cli->connPub, "joint_state_sub");
-	    	// 		connect_to_broker();
-	    	// 		addClientToMap(clientIp, tcp);
-	    	// 		break;
-	    	// 	case 1:
-	    	// 		getClientFromMap();
+			Client cli = getClientFromMap();
+	    	int op = processAmqpPacket(payload, cli);
+    		switch(op)
+    		{
+    			case 0:
+	    			cli = new client();
+	    			cli->connPub = amqp_new_connection();
+	    			amqp_connect(&cli->connPub, "joint_state_sub");
+	    			connect_to_broker();
+	    			addClientToMap(clientIp, tcp);
+	    			break;
+	    		// case 1:
+	    		// 	getClientFromMap();
 
-	    	// 		break;
-	    	// 	default:
-	    	// 		break;
-    		// }
+	    		// 	break;
+	    		default:
+	    			break;
+    		}
 
-	    	// 	if(isToPublish())
-	    	// 	{
-	    	// 		Client& cli = getClientFromMap();
-	    	// 		PublishRabbitMQ(ros::Time::now().toSec(), &cli->connection, "clock", "/clock");
-	    	// 	}
-	    	// }
+	    		// if(isToPublish())
+	    		// {
+	    		// 	Client& cli = getClientFromMap();
+	    		// 	PublishRabbitMQ(ros::Time::now().toSec(), &cli->connection, "clock", "/clock");
+	    		// }
+
 	    }
 	}
     return true;
