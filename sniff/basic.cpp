@@ -9,20 +9,25 @@
 #include <amqp_tcp_socket.h>
 #include <amqp.h>
 #include <amqp_framing.h>
+#include "utils.c"
 
 using namespace Tins;
 using namespace std;
 
-map<int, string> portMap;
 
+class Client
+{
+	public:
+		string ipAddress;
+		string user;
+		amqp_connection_state_t conn = NULL;
+		const char* exchange;
+		const char* queue;
+	
+};
 
-// class Client
-// {
-// 	string ipAddress;
-// 	string user;
-// 	amqp_connection_state_t *connPub = NULL;
-// 	amqp_connection_state_t *connSub = NULL;
-// };
+map<int, Client> portMap;
+
 
 
 // void PublishRabbitMQ()
@@ -61,21 +66,21 @@ map<int, string> portMap;
 // }
 
 
-// void amqp_connect(amqp_connection_state_t *conn, const char* exchange, bool declare_queue)
-// {
-// 	amqp_socket_t *socket = NULL;
-// 	int status;
+void amqp_connect(Client* cli)
+{
+	amqp_socket_t *socket = NULL;
+	int status;
 
-// 	socket = amqp_tcp_socket_new(*conn);
-// 	if (!socket) {
-// 		die("creating TCP socket");
-// 	}
+	socket = amqp_tcp_socket_new(cli->conn);
+	if (!socket) {
+		die("creating TCP socket");
+	}
 
-// 	status = amqp_socket_open(socket, (cli->ipAddress).c_str(), 5672);
-// 	if (status) {
-// 		die("opening TCP socket");
-// 	}
-// }
+	status = amqp_socket_open(socket, (cli->ipAddress).c_str(), 5672);
+	if (status) {
+		die("opening TCP socket");
+	}
+}
 
 // void amqp_declare_exchange(amqp_connection_state_t *conn, const char* exchange, bool declare_queue)
 // {
@@ -120,18 +125,23 @@ map<int, string> portMap;
 // // }
 
 
-// Client getClientFromMap()
-// {
+Client* getClientFromMap(int port)
+{
+	std::map<int,Client>::iterator it;
 
-// 	return client;
-// }
+	it = portMap.find(port);
+	if(it != portMap.end())
+		return &it->second;
+	return NULL;
+	
+}
 
 // void addClientToMap(int ip, const TCP& tcp)
 // {
 // 	portMap.insert(pair<int,string>(ip+":"+to_string(clientPort),topic) );
 // }
 
-int processAmqpPacket(RawPDU::payload_type payload, Client cli)
+int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 {
 	int operations = -1;
 	string message( payload.begin(), payload.end() );
@@ -330,15 +340,15 @@ bool count_packets(PDU &temp) {
 		if(tcp.dport() == 5672){
 			const RawPDU &raw = temp.rfind_pdu<RawPDU>();
 			const RawPDU::payload_type& payload = raw.payload();
-			Client cli = getClientFromMap();
+			Client* cli = getClientFromMap(tcp.sport());
 	    	int op = processAmqpPacket(payload, cli);
+	    	cout << op << endl;
     		switch(op)
     		{
     			case 0:
-	    			cli = new client();
-	    			cli->connPub = amqp_new_connection();
-	    			amqp_connect(&cli->connPub, "joint_state_sub");
-	    			connect_to_broker();
+	    			cli = new Client();
+	    			cli->conn = amqp_new_connection();
+	    			amqp_connect(cli);
 	    			addClientToMap(clientIp, tcp);
 	    			break;
 	    		// case 1:
