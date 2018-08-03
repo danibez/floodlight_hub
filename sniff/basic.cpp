@@ -26,6 +26,8 @@ class Client
 		string exchange_type;
 		string queue_name;
 		string routing_key;
+		int delMode;
+		RawPDU::payload_type payload;
 		void setId(int);
 		int getId() {return id;};
 };
@@ -39,28 +41,28 @@ map<int, Client> portMap;
 
 
 
-// void PublishRabbitMQ()
+// void PublishRabbitMQ(Client* cli)
 // {
-// 	std_msgs::Float64 msg;
-// 	msg.data = message;
+// 	// std_msgs::Float64 msg;
+// 	// msg.data = message;
 // 	amqp_basic_properties_t props;
 // 	props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_DELIVERY_MODE_FLAG;
 // 	props.content_type = amqp_cstring_bytes("text/plain");
-// 	props.delivery_mode = 2; /* persistent delivery mode */
+// 	props.delivery_mode = cli->delMode; /* persistent delivery mode */
 
 // 	// ================================================================================
-// 	namespace ser = ros::serialization;
-// 	size_t serial_size = ros::serialization::serializationLength(msg);
-// 	boost::shared_array<uint8_t> buffer(new uint8_t[serial_size]);
+// 	// namespace ser = ros::serialization;
+// 	// size_t serial_size = ros::serialization::serializationLength(msg);
+// 	// boost::shared_array<uint8_t> buffer(new uint8_t[serial_size]);
 
-// 	ser::OStream stream(buffer.get(), serial_size);
-// 	ser::serialize(stream, msg);
+// 	// ser::OStream stream(buffer.get(), serial_size);
+// 	// ser::serialize(stream, msg);
 
-// 	std::string s(buffer.get(), buffer.get()+serial_size);
+// 	// std::string s(buffer.get(), buffer.get()+serial_size);
 
-// 	amqp_bytes_t data;
-// 	data.len = serial_size;
-// 	data.bytes = (void*)s.data();
+// 	// amqp_bytes_t data;
+// 	// data.len = serial_size;
+// 	// data.bytes = (void*)s.data();
 // 	// ================================================================================
 
 // 	die_on_error(amqp_basic_publish(*conn,
@@ -73,6 +75,11 @@ map<int, Client> portMap;
 // 									data),
 // 				"Publishing");
 // }
+
+void PublishRabbitMQ(Client *cli)
+{
+
+}
 
 
 void amqp_connect(Client* cli)
@@ -321,40 +328,31 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 					cout << routing_key << endl;
 				}
 				else{
-					found = temp.find("3C028");//publish
+					found = temp.find("706C61");//publish
 					if(found != string::npos)
 					{
+						// int sizeTemp = found + 10;
+						// int delivery_mode = temp[sizeTemp]-'0';
+						// // cout << "delMode: " << delivery_mode << endl; 
+						// found = message.find("plain");
+						// sizeTemp += 18;
+
+						// int size;
+						// std::stringstream ss;
+						// string sizeVal (temp, sizeTemp, 1);
+						// if ((sizeVal.compare("0") == 0))// || (sizeVal.compare("2") == 0))
+						// {
+						// 	sizeTemp++;
+						// 	sizeVal += temp[sizeTemp-1];
+						// }
+						// ss << std::hex << sizeVal;
+						// ss >> size;
+						// cout << sizeVal << ' ' << size << endl;
 						operations = 4;
+						cli->payload = temp;
 						// cli->publish();
 						// cout << "=============================\n" << message << "\n=============================\n" << endl;
 					}
-
-					// found = temp.find("03C014");//Basic Consume
-					// if(found != string::npos)
-					// {
-					// 	operations = 4;
-					// 	// cout << ">>>>>Basic Consume\n";
-					// 	int sizeTemp = found + 9;
-					// 	found = message.find("<");
-					// 	found += 6;
-
-					// 	// cout << found << " " << sizeTemp << endl;
-					// 	// cout << message << endl;
-					// 	// cout << temp << endl;
-
-					// 	int size;
-					// 	std::stringstream ss;
-					// 	string sizeVal (temp, sizeTemp-1, 1);
-					// 	if ((sizeVal.compare("1") == 0) || (sizeVal.compare("2") == 0))
-					// 	{
-					// 		sizeTemp++;
-					// 		sizeVal += temp[sizeTemp-1];
-					// 	}
-					// 	ss << std::hex << sizeVal;
-					// 	ss >> size;
-
-					// 	string basic_consume (message, found, size);
-					// }
 				}
 			}
 		}
