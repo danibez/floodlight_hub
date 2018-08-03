@@ -17,14 +17,23 @@ using namespace std;
 
 class Client
 {
+		int id;
 	public:
-		string ipAddress;
+		string ipAddress="10.10.0.3";
 		string user;
 		amqp_connection_state_t conn = NULL;
-		const char* exchange;
-		const char* queue;
-	
+		string exchange_name;
+		string exchange_type;
+		string queue_name;
+		string routing_key;
+		void setId(int);
+		int getId() {return id;};
 };
+
+void Client::setId(int val)
+{
+	id = val;
+}
 
 map<int, Client> portMap;
 
@@ -80,35 +89,39 @@ void amqp_connect(Client* cli)
 	if (status) {
 		die("opening TCP socket");
 	}
+	cout << "connecting" << endl;
+	die_on_amqp_error(amqp_login(cli->conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "figment", "figment"),
+	                "Logging in");
+	amqp_channel_open(cli->conn, 1);
+	die_on_amqp_error(amqp_get_rpc_reply(cli->conn), "Opening channel");
 }
 
-// void amqp_declare_exchange(amqp_connection_state_t *conn, const char* exchange, bool declare_queue)
-// {
-// 	die_on_amqp_error(amqp_login(*conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, cli->user.c_str(), cli->user.c_str()),
-// 	                "Logging in");
-// 	amqp_channel_open(*conn, 1);
-// 	die_on_amqp_error(amqp_get_rpc_reply(*conn), "Opening channel");
+void amqp_declare_exchange(Client* cli)
+{
+	amqp_exchange_declare(cli->conn, 1, amqp_cstring_bytes(cli->exchange_name.c_str()), amqp_cstring_bytes(cli->exchange_type.c_str()),
+	                  0, 0, 0, 0, amqp_empty_table);
+	die_on_amqp_error(amqp_get_rpc_reply(cli->conn), "Declaring exchange");
+}
 
-// 	amqp_exchange_declare(*conn, 1, amqp_cstring_bytes(exchange), amqp_cstring_bytes("topic"),
-// 	                  0, 0, 0, 0, amqp_empty_table);
-// 	die_on_amqp_error(amqp_get_rpc_reply(*conn), "Declaring exchange");
-// }
+void amqp_declare_queue(Client* cli)
+{
+	amqp_bytes_t queuename = amqp_cstring_bytes(cli->queue_name.c_str());
+	amqp_queue_declare_ok_t *r = amqp_queue_declare(cli->conn, 1, queuename, 0, 0, 0, 0,
+	                             amqp_empty_table);
+	die_on_amqp_error(amqp_get_rpc_reply(cli->conn), "Declaring queue");
+	queuename = amqp_bytes_malloc_dup(r->queue);
+	if (queuename.bytes == NULL) {
+		fprintf(stderr, "Out of memory while copying queue name");
+	}
+}
 
-// void amqp_declare_queue()
-// {
-// 	amqp_bytes_t queuename = amqp_cstring_bytes(queue);
-// 	amqp_queue_declare_ok_t *r = amqp_queue_declare(*conn, 1, queuename, 0, 0, 0, 0,
-// 	                             amqp_empty_table);
-// 	die_on_amqp_error(amqp_get_rpc_reply(*conn), "Declaring queue");
-// 	queuename = amqp_bytes_malloc_dup(r->queue);
-// 	if (queuename.bytes == NULL) {
-// 		fprintf(stderr, "Out of memory while copying queue name");
-// 	}
-
-// 	amqp_queue_bind(*conn, 1, queuename, amqp_cstring_bytes(exchange), amqp_cstring_bytes(queue),
-// 	                amqp_empty_table);
-// 	die_on_amqp_error(amqp_get_rpc_reply(*conn), "Binding queue");
-// }
+void amqp_bind_queue(Client* cli)
+{
+	amqp_bytes_t queuename = amqp_cstring_bytes(cli->queue_name.c_str());
+	amqp_queue_bind(cli->conn, 1, queuename, amqp_cstring_bytes(cli->exchange_name.c_str()), amqp_cstring_bytes(cli->queue_name.c_str()),
+	                amqp_empty_table);
+	die_on_amqp_error(amqp_get_rpc_reply(cli->conn), "Binding queue");
+}
 
 // // bool isPublish()
 // // {
@@ -136,10 +149,10 @@ Client* getClientFromMap(int port)
 	
 }
 
-// void addClientToMap(int ip, const TCP& tcp)
-// {
-// 	portMap.insert(pair<int,string>(ip+":"+to_string(clientPort),topic) );
-// }
+void addClientToMap(int clientPort, Client cli)
+{
+	portMap.insert(pair<int,Client>(clientPort, cli));
+}
 
 int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 {
@@ -170,7 +183,7 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 			found = message.rfind("(");
 			found += 6;
 			// for (int i = 0; i < message.length(); i++)
-			// cout << ">>>>>Exchange Declare\n";
+			cout << ">>>>>Exchange Declare\n";
 
 			int size;
 			std::stringstream ss;
@@ -184,7 +197,7 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 			ss >> size;
 
 			string exchange_name (message, found, size);
-			// cout << exchange_name << endl;
+			cout << exchange_name << ' ' << exchange_name.length() << endl;
 
 
 
@@ -201,14 +214,23 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 			ss2 >> size;
 
 			string exchange_type(message, found, size);
-			// cout << exchange_type << endl;
+			found = exchange_name.find("Feedback");
+			// if(found != string::npos)
+			// {
+			// 	for(int i = 0; i < exchange_name.length(); i++)
+			// 		cout << exchange_name[i] << endl;
+			// }
+
+			// cli->exchange_name = exchange_name;
+			// cli->exchange_type = exchange_type;
+			cout << exchange_type.c_str() << ' ' << exchange_type.length() << endl;
 		}
 		else{
 			found = temp.find("0320A");//Queue Declare
 			if(found != string::npos)
 			{
 				operations = 2;
-				// cout << ">>>>>Queue Declare\n";
+				cout << ">>>>>Queue Declare\n";
 				int sizeTemp = found + 8;
 				found = message.find("2");
 				found += 6;
@@ -225,7 +247,8 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 				ss >> size;
 
 				string queue_name (message, found, size);
-				// cout << queue_name << endl;
+				// cli->queue_name = queue_name;
+				cout << queue_name << endl;
 			}
 			else{
 				found = temp.find("032014");//Queue Bind
@@ -253,7 +276,7 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 					ss >> size;
 
 					string queue_name (message, found, size);
-					// cout << queue_name << endl;
+					cout << queue_name << endl;
 
 
 
@@ -294,36 +317,44 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 					// cout << c << " " << sizeVal3 << ' ' << size << endl; 
 
 					string routing_key(message, found, size);
-					// cout << routing_key << endl;
+					// cli->routing_key = routing_key;
+					cout << routing_key << endl;
 				}
 				else{
-					found = temp.find("03C014");//Basic Consume
+					found = temp.find("3C028");//publish
 					if(found != string::npos)
 					{
 						operations = 4;
-						// cout << ">>>>>Basic Consume\n";
-						int sizeTemp = found + 9;
-						found = message.find("<");
-						found += 6;
-
-						// cout << found << " " << sizeTemp << endl;
-						// cout << message << endl;
-						// cout << temp << endl;
-
-						int size;
-						std::stringstream ss;
-						string sizeVal (temp, sizeTemp-1, 1);
-						if ((sizeVal.compare("1") == 0) || (sizeVal.compare("2") == 0))
-						{
-							sizeTemp++;
-							sizeVal += temp[sizeTemp-1];
-						}
-						ss << std::hex << sizeVal;
-						ss >> size;
-
-						string basic_consume (message, found, size);
-						// cout << basic_consume << endl;
+						// cli->publish();
+						// cout << "=============================\n" << message << "\n=============================\n" << endl;
 					}
+
+					// found = temp.find("03C014");//Basic Consume
+					// if(found != string::npos)
+					// {
+					// 	operations = 4;
+					// 	// cout << ">>>>>Basic Consume\n";
+					// 	int sizeTemp = found + 9;
+					// 	found = message.find("<");
+					// 	found += 6;
+
+					// 	// cout << found << " " << sizeTemp << endl;
+					// 	// cout << message << endl;
+					// 	// cout << temp << endl;
+
+					// 	int size;
+					// 	std::stringstream ss;
+					// 	string sizeVal (temp, sizeTemp-1, 1);
+					// 	if ((sizeVal.compare("1") == 0) || (sizeVal.compare("2") == 0))
+					// 	{
+					// 		sizeTemp++;
+					// 		sizeVal += temp[sizeTemp-1];
+					// 	}
+					// 	ss << std::hex << sizeVal;
+					// 	ss >> size;
+
+					// 	string basic_consume (message, found, size);
+					// }
 				}
 			}
 		}
@@ -342,22 +373,36 @@ bool count_packets(PDU &temp) {
 			const RawPDU::payload_type& payload = raw.payload();
 			Client* cli = getClientFromMap(tcp.sport());
 	    	int op = processAmqpPacket(payload, cli);
-	    	cout << op << endl;
-    		switch(op)
-    		{
-    			case 0:
-	    			cli = new Client();
-	    			cli->conn = amqp_new_connection();
-	    			amqp_connect(cli);
-	    			addClientToMap(clientIp, tcp);
-	    			break;
-	    		// case 1:
-	    		// 	getClientFromMap();
-
-	    		// 	break;
-	    		default:
-	    			break;
-    		}
+	    	// if(op >= 0)
+    		// cout << op << endl;
+    		// switch(op)
+    		// {
+    		// 	case 0:
+	    	// 		cli = new Client();
+	    	// 		cli->setId(tcp.sport());
+	    	// 		cli->conn = amqp_new_connection();
+	    	// 		amqp_connect(cli);
+	    	// 		addClientToMap(tcp.sport(), *cli);
+	    	// 		break;
+	    	// 	case 1:
+	    	// 		cli = getClientFromMap(tcp.sport());
+	    	// 		amqp_declare_exchange(cli);//, bool declare_queue)
+	    	// 		break;
+    		// 	case 2:
+	    	// 		cli = getClientFromMap(tcp.sport());
+	    	// 		amqp_declare_queue(cli);//, bool declare_queue)
+	    	// 		break;
+	    	// 	case 3:
+	    	// 		cli = getClientFromMap(tcp.sport());
+	    	// 		amqp_bind_queue(cli);//, bool declare_queue)
+	    	// 		break;
+	    	// 	case 4:
+	    	// 		// cli = getClientFromMap(tcp.sport());
+	    	// 		// amqp_bind_queue(cli);//, bool declare_queue)
+	    	// 		// break;
+	    	// 	default:
+	    	// 		break;
+    		// }
 
 	    		// if(isToPublish())
 	    		// {
@@ -375,6 +420,14 @@ int main() {
  	// Sniffer("h3-eth0").sniff_loop(count_packets);
     FileSniffer sniffer("/home/db/floodlight/sniff/trace.pcap");
     sniffer.sniff_loop(count_packets);
+    cout << "press Q to exit";
+    char isExit;
+    while(1)
+    {
+    	cin >> isExit;
+    	if(isExit == 'q')
+    		break;
+    }
     // =============================================================
     // // Sniff on the provided interface in promiscuos mode
     // Sniffer sniffer(argv[1], Sniffer::PROMISC);
@@ -390,38 +443,3 @@ int main() {
     // The address to resolve
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-//    // Always keep looping. When the end of the file is found, 
-//    // our callback will simply not be called again.
-//    IPv4Address to_resolve(ip.dst_addr());
-// // The interface we'll use, since we need the sender's HW address
-// NetworkInterface iface(to_resolve);
-// // The interface's information
-// auto info = iface.addresses();
-// // Make the request
-// const RawPDU &raw = temp.rfind_pdu<RawPDU>();
-// EthernetII pkt = EthernetII("00:00:00:00:00:03", "00:00:00:00:00:01")
-// 				 / IP("10.10.0.3", "10.10.0.1")
-// 				 / TCP(12345, 80) / RawPDU(raw);
-// // The sender
-// PacketSender sender;
-// // Send and receive the response.
-// std::unique_ptr<PDU> response(sender.send_recv(pkt, iface));
-// // Did we receive anything?
-// if (response) {
-//     // const ARP &arp = response->rfind_pdu<ARP>();
-//     std::cout << "CHEGOU" << std::endl;
-// }
-// else
-// 	std::cout << "Nothing" << std::endl;
