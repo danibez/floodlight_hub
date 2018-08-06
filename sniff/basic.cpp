@@ -9,25 +9,30 @@
 #include <amqp_tcp_socket.h>
 #include <amqp.h>
 #include <amqp_framing.h>
+#include <cstdlib>
+#include <iostream>
 #include "utils.c"
 
 using namespace Tins;
 using namespace std;
+
+#define VERBOSE 1
+#define TEST 1
 
 
 class Client
 {
 		int id;
 	public:
-		string ipAddress="10.10.0.3";
+		string ipAddress="10.10.0.4";
 		string user;
 		amqp_connection_state_t conn = NULL;
 		string exchange_name;
 		string exchange_type;
 		string queue_name;
 		string routing_key;
+		string payload;
 		int delMode;
-		RawPDU::payload_type payload;
 		void setId(int);
 		int getId() {return id;};
 };
@@ -39,6 +44,7 @@ void Client::setId(int val)
 
 map<int, Client> portMap;
 
+int counts=0;
 
 
 // void PublishRabbitMQ(Client* cli)
@@ -76,9 +82,36 @@ map<int, Client> portMap;
 // 				"Publishing");
 // }
 
-void PublishRabbitMQ(Client *cli)
+void amqp_publish(Client *cli)
 {
+	if(VERBOSE)
+		cout << "Publishing\n";
+	
+	amqp_basic_properties_t props;
+	props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_DELIVERY_MODE_FLAG;
+	props.content_type = amqp_cstring_bytes("text/plain");
+	props.delivery_mode = cli->delMode; /* persistent delivery mode */
 
+	if(VERBOSE)
+		cout << "Creating Data\n";
+	
+	amqp_bytes_t data;
+	data.len = cli->payload.length();
+	data.bytes = (void*)cli->payload.data();
+
+	// if(VERBOSE)
+	cout << cli->queue_name << endl;
+	
+	die_on_error(amqp_basic_publish(cli->conn,
+									1,
+									amqp_cstring_bytes(cli->exchange_name.c_str()),
+									amqp_cstring_bytes(cli->queue_name.c_str()),
+									0,
+									0,
+									&props,
+									data),
+				"Publishing");
+	cout << cli->queue_name << endl;
 }
 
 
@@ -96,7 +129,9 @@ void amqp_connect(Client* cli)
 	if (status) {
 		die("opening TCP socket");
 	}
-	cout << "connecting" << endl;
+	if(VERBOSE)
+		cout << "connecting" << endl;
+	
 	die_on_amqp_error(amqp_login(cli->conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "figment", "figment"),
 	                "Logging in");
 	amqp_channel_open(cli->conn, 1);
@@ -166,18 +201,27 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 	int operations = -1;
 	string message( payload.begin(), payload.end() );
 
+	stringstream ss;
+	ss << std::hex;
+    for(int i=0;i<payload.size();++i)
+        ss << std::setw(2) << std::setfill('0') << (unsigned int)payload[i];
+    // cout << ss.str() << endl;
+
 	// const char *msg = message.c_str();
-	stringstream result;
-	result << std::setw(2) << std::setfill('0') << std::hex << std::uppercase;
-	std::copy(message.begin(), message.end(), std::ostream_iterator<unsigned int>(result));
-	string temp(result.str());
+	// stringstream result;
+	// result << std::hex << std::uppercase;
+	// std::copy(payload.begin(), payload.end(), std::ostream_iterator<unsigned int>(result));
+	// unsigned int x = std::strtoul(message.c_str(), nullptr, 16);
+	// cout << x << endl;
+	string temp(ss.str());
 	size_t found;
-	// cout << message << endl;
+	// cout << "AQUI" << message << endl;
 
 	found = temp.find("0140A");//Connect AMQP
 	if(found != string::npos)
 	{
-		// cout << ">>>>>AMQP New Connection\n";
+		if(VERBOSE)
+			cout << ">>>>>AMQP New Connection\n";
 		operations = 0;
 		// cout << temp << endl;
 	}
@@ -190,7 +234,9 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 			found = message.rfind("(");
 			found += 6;
 			// for (int i = 0; i < message.length(); i++)
-			cout << ">>>>>Exchange Declare\n";
+			if(VERBOSE)
+				cout << ">>>>>Exchange Declare\n";
+			
 
 			int size;
 			std::stringstream ss;
@@ -204,9 +250,9 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 			ss >> size;
 
 			string exchange_name (message, found, size);
-			cout << exchange_name << ' ' << exchange_name.length() << endl;
-
-
+			if(VERBOSE)
+				cout << exchange_name << ' ' << exchange_name.length() << endl;
+			
 
 
 			found += size+1;
@@ -221,23 +267,29 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 			ss2 >> size;
 
 			string exchange_type(message, found, size);
-			found = exchange_name.find("Feedback");
+			// found = exchange_name.find("Feedback");
 			// if(found != string::npos)
 			// {
 			// 	for(int i = 0; i < exchange_name.length(); i++)
 			// 		cout << exchange_name[i] << endl;
 			// }
 
-			// cli->exchange_name = exchange_name;
-			// cli->exchange_type = exchange_type;
-			cout << exchange_type.c_str() << ' ' << exchange_type.length() << endl;
+			if(!TEST){
+				cli->exchange_name = exchange_name;
+				cli->exchange_type = exchange_type;
+			}
+			if(VERBOSE)
+				cout << exchange_type.c_str() << ' ' << exchange_type.length() << endl;
+			
 		}
 		else{
 			found = temp.find("0320A");//Queue Declare
 			if(found != string::npos)
 			{
 				operations = 2;
-				cout << ">>>>>Queue Declare\n";
+				if(VERBOSE)
+					cout << ">>>>>Queue Declare\n";
+				
 				int sizeTemp = found + 8;
 				found = message.find("2");
 				found += 6;
@@ -254,15 +306,20 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 				ss >> size;
 
 				string queue_name (message, found, size);
-				// cli->queue_name = queue_name;
-				cout << queue_name << endl;
+				if(!TEST)
+					cli->queue_name = queue_name;
+				if(VERBOSE)
+					cout << queue_name << endl;
+				
 			}
 			else{
 				found = temp.find("032014");//Queue Bind
 				if(found != string::npos)
 				{
 					operations = 3;
-					// cout << ">>>>>Queue Bind\n";
+					if(VERBOSE)
+						cout << ">>>>>Queue Bind\n";
+					
 					int sizeTemp = found + 9;
 					found = message.find("2");
 					found += 6;
@@ -283,8 +340,9 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 					ss >> size;
 
 					string queue_name (message, found, size);
-					cout << queue_name << endl;
-
+					if(VERBOSE)
+						cout << queue_name << endl;
+					
 
 
 					found += size+1;
@@ -303,8 +361,9 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 					// cout << c << endl; 
 
 					string exchange_name(message, found, size);
-					// cout << exchange_name << endl;
-
+					if(VERBOSE)
+						cout << exchange_name << endl;
+					
 
 
 					found += size+1;
@@ -324,35 +383,80 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 					// cout << c << " " << sizeVal3 << ' ' << size << endl; 
 
 					string routing_key(message, found, size);
-					// cli->routing_key = routing_key;
-					cout << routing_key << endl;
+					if(!TEST)
+						cli->routing_key = routing_key;
+					if(VERBOSE)
+						cout << routing_key << endl;
+					
 				}
 				else{
-					found = temp.find("706C61");//publish
+					found = temp.find("30100");
 					if(found != string::npos)
 					{
-						// int sizeTemp = found + 10;
-						// int delivery_mode = temp[sizeTemp]-'0';
-						// // cout << "delMode: " << delivery_mode << endl; 
-						// found = message.find("plain");
-						// sizeTemp += 18;
-
-						// int size;
-						// std::stringstream ss;
-						// string sizeVal (temp, sizeTemp, 1);
-						// if ((sizeVal.compare("0") == 0))// || (sizeVal.compare("2") == 0))
+						// size_t plain = message.find("plain");//publish
+						// if(plain != string::npos)
 						// {
-						// 	sizeTemp++;
-						// 	sizeVal += temp[sizeTemp-1];
-						// }
-						// ss << std::hex << sizeVal;
-						// ss >> size;
-						// cout << sizeVal << ' ' << size << endl;
-						operations = 4;
-						cli->payload = temp;
-						// cli->publish();
-						// cout << "=============================\n" << message << "\n=============================\n" << endl;
+						cout << ">>>>>Publish\n";
+						int sizeTemp = found;
+						char delivery_mode = temp[sizeTemp-3];
+						if(!TEST)
+							cli->delMode = (int)delivery_mode-48;
+						cout << "delivery_mode: " << delivery_mode << endl;
+						string data (temp, found, (temp.length()-2)-found);
+						// string data2 (data, 0, data.length()-2);
+						// plain = message.find("plain");
+						sizeTemp += 3;//sizeTemp + content_Body + channel + length
+						cout << data << endl;
+						string length (data, 3, 4);
+						string rest (data, 7);
+
+						int size;
+						std::stringstream ss;
+						ss << std::hex << length;
+						ss >> size;
+
+						if(size < rest.length())
+						{
+							length.push_back(rest[0]);
+							
+							std::stringstream ss;
+							ss << std::hex << length;
+							ss >> size;
+
+							if(size < rest.length())
+							{
+								char restFirst = rest[0];
+								length.push_back(rest[0]);
+								rest.erase(rest.begin());
+
+								std::stringstream ss;
+								ss << std::hex << length;
+								ss >> size;
+
+								if(size > rest.length())
+								{
+									// rest.insert(0, 1, restFirst);
+									length.pop_back();
+								}
+							}
+							else
+								length.pop_back();
+						}
+
+						cout << length << endl;
+						// for(int i; i<rest.length();i++)
+						// 	cout << (unsigned char)rest[i] << ' ' << rest.length() << endl;
+						cout << rest.data() << ' ' << rest.length() << endl;
+						
+						// cli->payload = rest;
 					}
+					else
+					{
+						// cout << "No Match: " << counts << endl ;
+						operations = -1;
+						// cout << temp << endl;
+					}
+					// cout << counts << endl;
 				}
 			}
 		}
@@ -364,6 +468,7 @@ bool count_packets(PDU &temp) {
 	const IP &ip = temp.rfind_pdu<IP>();
 	// cout << "Src address: " << ip.src_addr() << endl;
 	string clientIp = ip.src_addr().to_string();
+	counts++;
 	if((clientIp == "10.10.0.1") || (clientIp == "10.10.0.2")){
 		const TCP &tcp= temp.rfind_pdu<TCP>();
 		if(tcp.dport() == 5672){
@@ -371,36 +476,43 @@ bool count_packets(PDU &temp) {
 			const RawPDU::payload_type& payload = raw.payload();
 			Client* cli = getClientFromMap(tcp.sport());
 	    	int op = processAmqpPacket(payload, cli);
-	    	// if(op >= 0)
-    		// cout << op << endl;
-    		// switch(op)
-    		// {
-    		// 	case 0:
-	    	// 		cli = new Client();
-	    	// 		cli->setId(tcp.sport());
-	    	// 		cli->conn = amqp_new_connection();
-	    	// 		amqp_connect(cli);
-	    	// 		addClientToMap(tcp.sport(), *cli);
-	    	// 		break;
-	    	// 	case 1:
-	    	// 		cli = getClientFromMap(tcp.sport());
-	    	// 		amqp_declare_exchange(cli);//, bool declare_queue)
-	    	// 		break;
-    		// 	case 2:
-	    	// 		cli = getClientFromMap(tcp.sport());
-	    	// 		amqp_declare_queue(cli);//, bool declare_queue)
-	    	// 		break;
-	    	// 	case 3:
-	    	// 		cli = getClientFromMap(tcp.sport());
-	    	// 		amqp_bind_queue(cli);//, bool declare_queue)
-	    	// 		break;
-	    	// 	case 4:
-	    	// 		// cli = getClientFromMap(tcp.sport());
-	    	// 		// amqp_bind_queue(cli);//, bool declare_queue)
-	    	// 		// break;
-	    	// 	default:
-	    	// 		break;
-    		// }
+	    	if(VERBOSE){
+	    		if(op >= 0)
+    				cout << op << endl;
+	    	}
+    		
+
+    		if(!TEST){
+	    		switch(op)
+	    		{
+	    			case 0:
+		    			cli = new Client();
+		    			cli->setId(tcp.sport());
+		    			cli->conn = amqp_new_connection();
+		    			amqp_connect(cli);
+		    			addClientToMap(tcp.sport(), *cli);
+		    			break;
+		    		case 1:
+		    			// cli = getClientFromMap(tcp.sport());
+		    			amqp_declare_exchange(cli);//, bool declare_queue)
+		    			break;
+	    			case 2:
+		    			// cli = getClientFromMap(tcp.sport());
+		    			amqp_declare_queue(cli);//, bool declare_queue)
+		    			break;
+		    		case 3:
+		    			// cli = getClientFromMap(tcp.sport());
+		    			amqp_bind_queue(cli);//, bool declare_queue)
+		    			break;
+		    		case 4:
+		    			// cli = getClientFromMap(tcp.sport());
+		    			amqp_publish(cli);//, bool declare_queue)
+		    			// break;
+		    		default:
+		    			break;
+	    		}
+	    	}
+    		
 
 	    		// if(isToPublish())
 	    		// {
@@ -415,17 +527,20 @@ bool count_packets(PDU &temp) {
 
 
 int main() {
- 	// Sniffer("h3-eth0").sniff_loop(count_packets);
-    FileSniffer sniffer("/home/db/floodlight/sniff/trace.pcap");
-    sniffer.sniff_loop(count_packets);
-    cout << "press Q to exit";
-    char isExit;
-    while(1)
-    {
-    	cin >> isExit;
-    	if(isExit == 'q')
-    		break;
+ 	if(!TEST)
+ 		Sniffer("h3-eth0").sniff_loop(count_packets);
+ 	else{
+    	FileSniffer sniffer("/home/db/floodlight/sniff/traceh3.pcap");
+    	sniffer.sniff_loop(count_packets);
     }
+    // cout << "press Q to exit";
+    // char isExit;
+    // while(1)
+    // {
+    // 	cin >> isExit;
+    // 	if(isExit == 'q')
+    // 		break;
+    // }
     // =============================================================
     // // Sniff on the provided interface in promiscuos mode
     // Sniffer sniffer(argv[1], Sniffer::PROMISC);

@@ -24,3 +24,64 @@
 
 // 	string basic_consume (message, found, size);
 // }
+
+
+
+if(VERBOSE)
+							cout << ">>>>>Publish\n";
+							int sizeTemp = plain + 10;
+							string lol (temp, plain);
+							char delivery_mode = temp[sizeTemp];
+							// cout << "delMode: " << (int)delivery_mode-48 << endl;
+							// cout << temp[sizeTemp-2] << ' ' << temp[sizeTemp-1] << ' ' << temp[sizeTemp] << ' ' << temp[sizeTemp+1]<< endl; 
+							// cout << lol << endl;
+							if(!TEST)
+								cli->delMode = (int)delivery_mode-48;
+							plain = message.find("plain");
+						// if(plain != string::npos)
+						// {
+							sizeTemp += 3+2+1;//sizeTemp + content_Body + channel + length
+							cout << cli->getId() << endl;
+							// size_t rfound = message.rfind("CE");
+							// cout << message.length() << endl;
+							// string pre_result(message, found);
+							// cout << pre_result << endl;
+							// string result;
+							// if(message.length() < (plain + 14)){
+							// 	string result (message, plain);
+							// }
+							// else{
+							string result (message, plain+14);
+							// }
+							// cout << found+14 << endl;
+							// for(int i=0; i<message.length(); i++)
+							// {
+							// 	if(i>=found+14)
+							// 		cout <<(message[i]);
+							// 	// if((temp[i] == 'E') && (temp[i-1] == 'C'))
+							// 	// 	cout << endl;
+							// }
+							// cout << endl;
+							// int size;
+							// std::stringstream ss;
+							// string sizeVal (temp, sizeTemp, 1);
+							// if ((sizeVal.compare("0") == 0))// || (sizeVal.compare("2") == 0))
+							// {
+							// 	sizeTemp++;
+							// 	sizeVal += temp[sizeTemp-1];
+							// }
+							// ss << std::hex << sizeVal;
+							// ss >> size;
+							// cout << sizeVal << ' ' << size << endl;
+
+
+							operations = 4;
+							if(VERBOSE)
+								cout << result << endl;
+							if(!TEST)
+								cli->payload = result;
+						}
+						else
+						{
+							operations = -1;
+						}
