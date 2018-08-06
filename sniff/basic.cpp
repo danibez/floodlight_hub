@@ -13,11 +13,14 @@
 #include <iostream>
 #include "utils.c"
 
+#include <algorithm>
+#include <stdexcept>
+
 using namespace Tins;
 using namespace std;
 
-#define VERBOSE 1
-#define TEST 1
+#define VERBOSE 0
+#define TEST 0
 
 
 class Client
@@ -94,14 +97,22 @@ void amqp_publish(Client *cli)
 
 	if(VERBOSE)
 		cout << "Creating Data\n";
+
+	// size_t serial_size = cli->payload.length();
+	// boost::shared_array<uint8_t> buffer(new uint8_t[serial_size]);
 	
+	// ser::OStream stream(buffer.get(), serial_size);
+	// ser::serialize(stream, msg);
+	
+	// std::string s(buffer.get(), buffer.get()+serial_size);
+
+	// std::vector<uint8_t> myVector(cli->payload.begin(), cli->payload.end());
+	// uint8_t *p = &myVector[0];
+
 	amqp_bytes_t data;
 	data.len = cli->payload.length();
 	data.bytes = (void*)cli->payload.data();
 
-	// if(VERBOSE)
-	cout << cli->queue_name << endl;
-	
 	die_on_error(amqp_basic_publish(cli->conn,
 									1,
 									amqp_cstring_bytes(cli->exchange_name.c_str()),
@@ -111,7 +122,6 @@ void amqp_publish(Client *cli)
 									&props,
 									data),
 				"Publishing");
-	cout << cli->queue_name << endl;
 }
 
 
@@ -160,7 +170,7 @@ void amqp_declare_queue(Client* cli)
 void amqp_bind_queue(Client* cli)
 {
 	amqp_bytes_t queuename = amqp_cstring_bytes(cli->queue_name.c_str());
-	amqp_queue_bind(cli->conn, 1, queuename, amqp_cstring_bytes(cli->exchange_name.c_str()), amqp_cstring_bytes(cli->queue_name.c_str()),
+	amqp_queue_bind(cli->conn, 1, queuename, amqp_cstring_bytes(cli->exchange_name.c_str()), amqp_cstring_bytes(cli->routing_key.c_str()),
 	                amqp_empty_table);
 	die_on_amqp_error(amqp_get_rpc_reply(cli->conn), "Binding queue");
 }
@@ -196,6 +206,29 @@ void addClientToMap(int clientPort, Client cli)
 	portMap.insert(pair<int,Client>(clientPort, cli));
 }
 
+std::string hex_to_string(const std::string& input)
+{
+    static const char* const lut = "0123456789abcdef";
+    size_t len = input.length();
+    if (len & 1) throw std::invalid_argument("odd length");
+
+    std::string output;
+    output.reserve(len / 2);
+    for (size_t i = 0; i < len; i += 2)
+    {
+        char a = input[i];
+        const char* p = std::lower_bound(lut, lut + 16, a);
+        if (*p != a) throw std::invalid_argument("not a hex digit");
+
+        char b = input[i + 1];
+        const char* q = std::lower_bound(lut, lut + 16, b);
+        if (*q != b) throw std::invalid_argument("not a hex digit");
+
+        output.push_back(((p - lut) << 4) | (q - lut));
+    }
+    return output;
+}
+
 int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 {
 	int operations = -1;
@@ -217,7 +250,7 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 	size_t found;
 	// cout << "AQUI" << message << endl;
 
-	found = temp.find("0140A");//Connect AMQP
+	found = temp.find("0014000a");//Connect AMQP
 	if(found != string::npos)
 	{
 		if(VERBOSE)
@@ -226,53 +259,39 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 		// cout << temp << endl;
 	}
 	else{
-		found = temp.find("0280A");//Exchange Declare
+		found = temp.find("0028000a");//Exchange Declare
 		if(found != string::npos)
 		{
 			operations = 1;
-			int sizeTemp = found + 8;
-			found = message.rfind("(");
-			found += 6;
-			// for (int i = 0; i < message.length(); i++)
+			int sizeTemp = found + 14;
 			if(VERBOSE)
 				cout << ">>>>>Exchange Declare\n";
 			
 
 			int size;
 			std::stringstream ss;
-			string sizeVal (temp, sizeTemp-1, 1);
-			if (sizeVal.compare("1") == 0)
-			{
-				sizeTemp++;
-				sizeVal += temp[sizeTemp-1];
-			}
+			string sizeVal (temp, sizeTemp-2, 2);
 			ss << std::hex << sizeVal;
 			ss >> size;
+			size *= 2;
 
-			string exchange_name (message, found, size);
+			string ex (temp, sizeTemp, size);
+			string exchange_name = hex_to_string(ex);
+
+			sizeTemp += size+2;
+
+
 			if(VERBOSE)
 				cout << exchange_name << ' ' << exchange_name.length() << endl;
 			
-
-
-			found += size+1;
-			sizeTemp += size*2;
-			char c = temp[sizeTemp];
-
 			std::stringstream ss2;
-			string sizeVal2 (temp, sizeTemp, 1);
-			if (sizeVal2.compare("1") == 0)
-				sizeVal2 += temp[sizeTemp+1];
+			string sizeVal2 (temp, sizeTemp-2, 2);
 			ss2 << std::hex << sizeVal2;
 			ss2 >> size;
+			size *= 2;
 
-			string exchange_type(message, found, size);
-			// found = exchange_name.find("Feedback");
-			// if(found != string::npos)
-			// {
-			// 	for(int i = 0; i < exchange_name.length(); i++)
-			// 		cout << exchange_name[i] << endl;
-			// }
+			string type (temp, sizeTemp, size);
+			string exchange_type = hex_to_string(type);
 
 			if(!TEST){
 				cli->exchange_name = exchange_name;
@@ -283,29 +302,26 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 			
 		}
 		else{
-			found = temp.find("0320A");//Queue Declare
+			found = temp.find("0032000a");//Queue Declare
 			if(found != string::npos)
 			{
 				operations = 2;
 				if(VERBOSE)
 					cout << ">>>>>Queue Declare\n";
 				
-				int sizeTemp = found + 8;
-				found = message.find("2");
-				found += 6;
+				int sizeTemp = found + 14;
+
 
 				int size;
 				std::stringstream ss;
-				string sizeVal (temp, sizeTemp-1, 1);
-				if ((sizeVal.compare("1") == 0) || (sizeVal.compare("2") == 0))
-				{
-					sizeTemp++;
-					sizeVal += temp[sizeTemp-1];
-				}
+				string sizeVal (temp, sizeTemp-2, 2);
 				ss << std::hex << sizeVal;
 				ss >> size;
+				size *= 2;
 
-				string queue_name (message, found, size);
+				string q (temp, sizeTemp, size);
+				string queue_name = hex_to_string(q);
+
 				if(!TEST)
 					cli->queue_name = queue_name;
 				if(VERBOSE)
@@ -313,76 +329,58 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 				
 			}
 			else{
-				found = temp.find("032014");//Queue Bind
+				found = temp.find("00320014");//Queue Bind
 				if(found != string::npos)
 				{
 					operations = 3;
 					if(VERBOSE)
 						cout << ">>>>>Queue Bind\n";
 					
-					int sizeTemp = found + 9;
-					found = message.find("2");
-					found += 6;
-
-					// cout << found << " " << sizeTemp << endl;
-					// cout << message << endl;
-					// cout << temp << endl;
+					int sizeTemp = found + 14;
 
 					int size;
 					std::stringstream ss;
-					string sizeVal (temp, sizeTemp-1, 1);
-					if ((sizeVal.compare("1") == 0) || (sizeVal.compare("2") == 0))
-					{
-						sizeTemp++;
-						sizeVal += temp[sizeTemp-1];
-					}
+					string sizeVal (temp, sizeTemp-2, 2);
 					ss << std::hex << sizeVal;
 					ss >> size;
+					size *= 2;
 
-					string queue_name (message, found, size);
+					string q (temp, sizeTemp, size);
+					string queue_name = hex_to_string(q);
+
+					sizeTemp += size+2;
+
+
 					if(VERBOSE)
-						cout << queue_name << endl;
+						cout << queue_name << ' ' << queue_name.length() << endl;
 					
-
-
-					found += size+1;
-					sizeTemp += size*2;
-					char c = temp[sizeTemp];
-
 					std::stringstream ss2;
-					string sizeVal2 (temp, sizeTemp, 1);
-					if ((sizeVal2.compare("1") == 0))// || (sizeVal2.compare("2") == 0))
-					{
-						sizeTemp++;
-						sizeVal2 += temp[sizeTemp-1];
-					}
+					string sizeVal2 (temp, sizeTemp-2, 2);
 					ss2 << std::hex << sizeVal2;
 					ss2 >> size;
-					// cout << c << endl; 
+					size *= 2;
 
-					string exchange_name(message, found, size);
+					string ex (temp, sizeTemp, size);
+					string exchange_name = hex_to_string(ex);
+
 					if(VERBOSE)
-						cout << exchange_name << endl;
+						cout << exchange_name << ' ' << exchange_name.length() << endl;
 					
-
-
-					found += size+1;
-					sizeTemp += (size*2)+1;
-					c = temp[sizeTemp];
-					// cout << c << ' ' << temp[sizeTemp+1] << endl;
+					sizeTemp += size+2;
 
 					std::stringstream ss3;
-					string sizeVal3 (temp, sizeTemp, 1);
-					if ((sizeVal3.compare("1") == 0) || (sizeVal3.compare("2") == 0))
-					{
-						sizeTemp++;
-						sizeVal3 += temp[sizeTemp];
-					}
+					string sizeVal3 (temp, sizeTemp-2, 2);
 					ss3 << std::hex << sizeVal3;
 					ss3 >> size;
-					// cout << c << " " << sizeVal3 << ' ' << size << endl; 
+					size *= 2;
 
-					string routing_key(message, found, size);
+					string rk (temp, sizeTemp, size);
+					string routing_key = hex_to_string(rk);
+
+					if(VERBOSE)
+						cout << routing_key << ' ' << routing_key.length() << endl;
+					
+
 					if(!TEST)
 						cli->routing_key = routing_key;
 					if(VERBOSE)
@@ -390,65 +388,34 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 					
 				}
 				else{
-					found = temp.find("30100");
+					found = temp.find("030001");
 					if(found != string::npos)
 					{
-						// size_t plain = message.find("plain");//publish
-						// if(plain != string::npos)
-						// {
-						cout << ">>>>>Publish\n";
-						int sizeTemp = found;
-						char delivery_mode = temp[sizeTemp-3];
-						if(!TEST)
-							cli->delMode = (int)delivery_mode-48;
-						cout << "delivery_mode: " << delivery_mode << endl;
-						string data (temp, found, (temp.length()-2)-found);
-						// string data2 (data, 0, data.length()-2);
-						// plain = message.find("plain");
-						sizeTemp += 3;//sizeTemp + content_Body + channel + length
-						cout << data << endl;
-						string length (data, 3, 4);
-						string rest (data, 7);
+						operations = 4;
+						if(VERBOSE)
+							cout << ">>>>>Publish\n";
+
+						int sizeTemp = found + 6;
+
+						string payload_size (temp, sizeTemp, 8);
 
 						int size;
 						std::stringstream ss;
-						ss << std::hex << length;
+						ss << std::hex << payload_size;
 						ss >> size;
+						size *= 2;
 
-						if(size < rest.length())
-						{
-							length.push_back(rest[0]);
-							
-							std::stringstream ss;
-							ss << std::hex << length;
-							ss >> size;
+						sizeTemp += 8;
 
-							if(size < rest.length())
-							{
-								char restFirst = rest[0];
-								length.push_back(rest[0]);
-								rest.erase(rest.begin());
+						string data (temp, sizeTemp, size);
+						string payload_data = hex_to_string(data);
 
-								std::stringstream ss;
-								ss << std::hex << length;
-								ss >> size;
-
-								if(size > rest.length())
-								{
-									// rest.insert(0, 1, restFirst);
-									length.pop_back();
-								}
-							}
-							else
-								length.pop_back();
-						}
-
-						cout << length << endl;
-						// for(int i; i<rest.length();i++)
-						// 	cout << (unsigned char)rest[i] << ' ' << rest.length() << endl;
-						cout << rest.data() << ' ' << rest.length() << endl;
 						
-						// cli->payload = rest;
+
+						// cout << p << endl;
+
+						if(!TEST)
+							cli->payload = payload_data;
 					}
 					else
 					{
@@ -507,7 +474,7 @@ bool count_packets(PDU &temp) {
 		    		case 4:
 		    			// cli = getClientFromMap(tcp.sport());
 		    			amqp_publish(cli);//, bool declare_queue)
-		    			// break;
+		    			break;
 		    		default:
 		    			break;
 	    		}
