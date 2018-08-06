@@ -33,8 +33,11 @@ class Client
 		string exchange_name;
 		string exchange_type;
 		string queue_name;
+		string bQueue_name;
+		string bExchange_name;
 		string routing_key;
 		string payload;
+		amqp_bytes_t qMalloc;
 		int delMode;
 		void setId(int);
 		int getId() {return id;};
@@ -150,6 +153,7 @@ void amqp_connect(Client* cli)
 
 void amqp_declare_exchange(Client* cli)
 {
+	cout << cli->exchange_name << ' ' << cli->exchange_name.c_str() << endl;
 	amqp_exchange_declare(cli->conn, 1, amqp_cstring_bytes(cli->exchange_name.c_str()), amqp_cstring_bytes(cli->exchange_type.c_str()),
 	                  0, 0, 0, 0, amqp_empty_table);
 	die_on_amqp_error(amqp_get_rpc_reply(cli->conn), "Declaring exchange");
@@ -165,12 +169,15 @@ void amqp_declare_queue(Client* cli)
 	if (queuename.bytes == NULL) {
 		fprintf(stderr, "Out of memory while copying queue name");
 	}
+	cli->qMalloc = queuename;
 }
 
 void amqp_bind_queue(Client* cli)
 {
-	amqp_bytes_t queuename = amqp_cstring_bytes(cli->queue_name.c_str());
-	amqp_queue_bind(cli->conn, 1, queuename, amqp_cstring_bytes(cli->exchange_name.c_str()), amqp_cstring_bytes(cli->routing_key.c_str()),
+	cout << cli->exchange_name << endl;
+
+	// amqp_bytes_t queuename = amqp_cstring_bytes(cli->queue_name.c_str());
+	amqp_queue_bind(cli->conn, 1, cli->qMalloc, amqp_cstring_bytes(cli->bExchange_name.c_str()), amqp_cstring_bytes(cli->bQueue_name.c_str()),
 	                amqp_empty_table);
 	die_on_amqp_error(amqp_get_rpc_reply(cli->conn), "Binding queue");
 }
@@ -381,8 +388,11 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 						cout << routing_key << ' ' << routing_key.length() << endl;
 					
 
-					if(!TEST)
+					if(!TEST){
+						cli->bQueue_name = queue_name;
+						cli->bExchange_name = exchange_name;
 						cli->routing_key = routing_key;
+					}
 					if(VERBOSE)
 						cout << routing_key << endl;
 					
@@ -443,11 +453,6 @@ bool count_packets(PDU &temp) {
 			const RawPDU::payload_type& payload = raw.payload();
 			Client* cli = getClientFromMap(tcp.sport());
 	    	int op = processAmqpPacket(payload, cli);
-	    	if(VERBOSE){
-	    		if(op >= 0)
-    				cout << op << endl;
-	    	}
-    		
 
     		if(!TEST){
 	    		switch(op)
@@ -479,14 +484,6 @@ bool count_packets(PDU &temp) {
 		    			break;
 	    		}
 	    	}
-    		
-
-	    		// if(isToPublish())
-	    		// {
-	    		// 	Client& cli = getClientFromMap();
-	    		// 	PublishRabbitMQ(ros::Time::now().toSec(), &cli->connection, "clock", "/clock");
-	    		// }
-
 	    }
 	}
     return true;
