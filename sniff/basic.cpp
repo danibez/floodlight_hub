@@ -52,42 +52,6 @@ map<int, Client> portMap;
 
 int counts=0;
 
-
-// void PublishRabbitMQ(Client* cli)
-// {
-// 	// std_msgs::Float64 msg;
-// 	// msg.data = message;
-// 	amqp_basic_properties_t props;
-// 	props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_DELIVERY_MODE_FLAG;
-// 	props.content_type = amqp_cstring_bytes("text/plain");
-// 	props.delivery_mode = cli->delMode; /* persistent delivery mode */
-
-// 	// ================================================================================
-// 	// namespace ser = ros::serialization;
-// 	// size_t serial_size = ros::serialization::serializationLength(msg);
-// 	// boost::shared_array<uint8_t> buffer(new uint8_t[serial_size]);
-
-// 	// ser::OStream stream(buffer.get(), serial_size);
-// 	// ser::serialize(stream, msg);
-
-// 	// std::string s(buffer.get(), buffer.get()+serial_size);
-
-// 	// amqp_bytes_t data;
-// 	// data.len = serial_size;
-// 	// data.bytes = (void*)s.data();
-// 	// ================================================================================
-
-// 	die_on_error(amqp_basic_publish(*conn,
-// 									1,
-// 									amqp_cstring_bytes(exchange),
-// 									amqp_cstring_bytes(queue),
-// 									0,
-// 									0,
-// 									&props,
-// 									data),
-// 				"Publishing");
-// }
-
 void amqp_publish(Client *cli)
 {
 	if(VERBOSE)
@@ -97,9 +61,6 @@ void amqp_publish(Client *cli)
 	props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_DELIVERY_MODE_FLAG;
 	props.content_type = amqp_cstring_bytes("text/plain");
 	props.delivery_mode = cli->delMode; /* persistent delivery mode */
-
-	if(VERBOSE)
-		cout << "Creating Data\n";
 
 	// size_t serial_size = cli->payload.length();
 	// boost::shared_array<uint8_t> buffer(new uint8_t[serial_size]);
@@ -115,7 +76,10 @@ void amqp_publish(Client *cli)
 	amqp_bytes_t data;
 	data.len = cli->payload.length();
 	data.bytes = (void*)cli->payload.data();
-
+	// const char* b = cli->payload;
+	// if(cli->exchange_name.compare("clock") == 0){
+	// 	cout << cli->exchange_name << ' ' << cli->payload.data() << endl;
+	// }
 	die_on_error(amqp_basic_publish(cli->conn,
 									1,
 									amqp_cstring_bytes(cli->exchange_name.c_str()),
@@ -153,15 +117,17 @@ void amqp_connect(Client* cli)
 
 void amqp_declare_exchange(Client* cli)
 {
-	cout << cli->exchange_name << ' ' << cli->exchange_name.c_str() << endl;
-	amqp_exchange_declare(cli->conn, 1, amqp_cstring_bytes(cli->exchange_name.c_str()), amqp_cstring_bytes(cli->exchange_type.c_str()),
+	const char* ex = cli->exchange_name.c_str();
+	const char* exT = cli->exchange_type.c_str();
+	amqp_exchange_declare(cli->conn, 1, amqp_cstring_bytes(ex), amqp_cstring_bytes(exT),
 	                  0, 0, 0, 0, amqp_empty_table);
 	die_on_amqp_error(amqp_get_rpc_reply(cli->conn), "Declaring exchange");
 }
 
 void amqp_declare_queue(Client* cli)
 {
-	amqp_bytes_t queuename = amqp_cstring_bytes(cli->queue_name.c_str());
+	const char* q = cli->queue_name.c_str();
+	amqp_bytes_t queuename = amqp_cstring_bytes(q);
 	amqp_queue_declare_ok_t *r = amqp_queue_declare(cli->conn, 1, queuename, 0, 0, 0, 0,
 	                             amqp_empty_table);
 	die_on_amqp_error(amqp_get_rpc_reply(cli->conn), "Declaring queue");
@@ -174,28 +140,13 @@ void amqp_declare_queue(Client* cli)
 
 void amqp_bind_queue(Client* cli)
 {
-	cout << cli->exchange_name << endl;
-
 	// amqp_bytes_t queuename = amqp_cstring_bytes(cli->queue_name.c_str());
-	amqp_queue_bind(cli->conn, 1, cli->qMalloc, amqp_cstring_bytes(cli->bExchange_name.c_str()), amqp_cstring_bytes(cli->bQueue_name.c_str()),
+	const char* ex = cli->bExchange_name.c_str();
+	const char* q = cli->bQueue_name.c_str();
+	amqp_queue_bind(cli->conn, 1, cli->qMalloc, amqp_cstring_bytes(ex), amqp_cstring_bytes(q),
 	                amqp_empty_table);
 	die_on_amqp_error(amqp_get_rpc_reply(cli->conn), "Binding queue");
 }
-
-// // bool isPublish()
-// // {
-// // 	bool publish;
-// // 	return publish;
-// // }
-
-// // bool isConnected(int ip, const TCP& tcp)
-// // {
-// // 	// cout << "FOUND AMQP at port " << tcp.sport() << "\n";
-// // 	int clientPort = tcp.sport()
-// // 	// std::string s = std::to_string(42);
-// // 	portMap.insert(pair<int,string>(ip+":"+to_string(clientPort),topic) );
-// // }
-
 
 Client* getClientFromMap(int port)
 {
@@ -233,6 +184,31 @@ std::string hex_to_string(const std::string& input)
 
         output.push_back(((p - lut) << 4) | (q - lut));
     }
+    return output;
+}
+
+char* hex_to_char(const std::string& input)
+{
+    static const char* const lut = "0123456789abcdef";
+    size_t len = input.length();
+    int k=0;
+    if (len & 1) throw std::invalid_argument("odd length");
+
+    char* output = new char[(len/2)+1];
+    for (size_t i = 0; i < len; i += 2)
+    {
+        char a = input[i];
+        const char* p = std::lower_bound(lut, lut + 16, a);
+        if (*p != a) throw std::invalid_argument("not a hex digit");
+
+        char b = input[i + 1];
+        const char* q = std::lower_bound(lut, lut + 16, b);
+        if (*q != b) throw std::invalid_argument("not a hex digit");
+
+        output[k] = ((p - lut) << 4) | (q - lut);
+        k++;
+    }
+    output[k] = '\0';
     return output;
 }
 
@@ -398,6 +374,7 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 					
 				}
 				else{
+					size_t found;
 					found = temp.find("030001");
 					if(found != string::npos)
 					{
@@ -406,7 +383,21 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 							cout << ">>>>>Publish\n";
 
 						int sizeTemp = found + 6;
+						// cout << temp << endl;
+						if(found >= 4){
+							string delMode (temp, found-4, 2);
+							int mode;
+							std::stringstream ssMode;
+							ssMode << std::hex << delMode;
+							ssMode >> mode;
 
+							cli->delMode = mode;
+						}
+						else
+							cli->delMode = 2;
+
+						
+						// cout << temp;
 						string payload_size (temp, sizeTemp, 8);
 
 						int size;
@@ -418,14 +409,21 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 						sizeTemp += 8;
 
 						string data (temp, sizeTemp, size);
-						string payload_data = hex_to_string(data);
+						// string payload_data = hex_to_string(data);
+						cli->payload = hex_to_string(data);
+						// cout << payload_data;
+
 
 						
 
 						// cout << p << endl;
 
 						if(!TEST)
-							cli->payload = payload_data;
+						{
+							// 	char * copy = malloc(strlen(original) + 1); 
+							// 	strcpy(copy, original);
+							// cli->payload = payload_data;
+						}
 					}
 					else
 					{
@@ -461,23 +459,27 @@ bool count_packets(PDU &temp) {
 		    			cli = new Client();
 		    			cli->setId(tcp.sport());
 		    			cli->conn = amqp_new_connection();
+		    			if(ip.dst_addr().to_string().compare("10.10.0.3") == 0)
+		    				cli->ipAddress = "10.10.0.4";
+		    			else
+		    				cli->ipAddress = "10.10.0.3";
 		    			amqp_connect(cli);
 		    			addClientToMap(tcp.sport(), *cli);
 		    			break;
 		    		case 1:
-		    			// cli = getClientFromMap(tcp.sport());
+		    			cli = getClientFromMap(tcp.sport());
 		    			amqp_declare_exchange(cli);//, bool declare_queue)
 		    			break;
 	    			case 2:
-		    			// cli = getClientFromMap(tcp.sport());
+		    			cli = getClientFromMap(tcp.sport());
 		    			amqp_declare_queue(cli);//, bool declare_queue)
 		    			break;
 		    		case 3:
-		    			// cli = getClientFromMap(tcp.sport());
+		    			cli = getClientFromMap(tcp.sport());
 		    			amqp_bind_queue(cli);//, bool declare_queue)
 		    			break;
 		    		case 4:
-		    			// cli = getClientFromMap(tcp.sport());
+		    			cli = getClientFromMap(tcp.sport());
 		    			amqp_publish(cli);//, bool declare_queue)
 		    			break;
 		    		default:
@@ -490,21 +492,30 @@ bool count_packets(PDU &temp) {
 }
 
 
-int main() {
- 	if(!TEST)
- 		Sniffer("h3-eth0").sniff_loop(count_packets);
- 	else{
-    	FileSniffer sniffer("/home/db/floodlight/sniff/traceh3.pcap");
-    	sniffer.sniff_loop(count_packets);
+int main(int argc, char* argv[]) {
+	if (argc != 2) {
+        // Tell the user how to run the program
+        std::cerr << "Just pass the Interface argument!" << std::endl;
+        /* "Usage messages" are a conventional way of telling the user
+         * how to run a program if they enter the command incorrectly.
+         */
+        return 1;
     }
-    // cout << "press Q to exit";
-    // char isExit;
-    // while(1)
-    // {
-    // 	cin >> isExit;
-    // 	if(isExit == 'q')
-    // 		break;
-    // }
+    const char* interface = argv[1];
+ 	if(!TEST)
+ 		Sniffer(interface).sniff_loop(count_packets);
+ 	else{
+		FileSniffer sniffer("/home/db/floodlight/sniff/traceh3.pcap");
+		sniffer.sniff_loop(count_packets);
+    }
+    cout << "press Q to exit";
+    char isExit;
+    while(1)
+    {
+    	cin >> isExit;
+    	if(isExit == 'q')
+    		break;
+    }
     // =============================================================
     // // Sniff on the provided interface in promiscuos mode
     // Sniffer sniffer(argv[1], Sniffer::PROMISC);
