@@ -62,35 +62,31 @@ void amqp_publish(Client *cli)
 		cout << "Publishing\n";
 	
 	amqp_basic_properties_t props;
-	
-	props.content_type = amqp_cstring_bytes("text/plain");
-	props.delivery_mode = cli->delMode; /* persistent delivery mode */
 
-	if(!cli->reply_to.empty()){
-		props._flags = 	AMQP_BASIC_CONTENT_TYPE_FLAG |
-						AMQP_BASIC_DELIVERY_MODE_FLAG |
-						AMQP_BASIC_REPLY_TO_FLAG |
-						AMQP_BASIC_CORRELATION_ID_FLAG;
-		cout << "AEHOOOO\n";
-		// amqp_bytes_t corr;
-		// corr.len = cli->corr_id.length();
-		// corr.bytes = (void*)cli->corr_id.data();
+	// cout << "ASD: " << cli->corr_id << endl;
 
-		// amqp_bytes_t reply;
-		// reply.len = cli->reply_to.length();
-		// reply.bytes = (void*)cli->reply_to.data();
-
+	if(!cli->corr_id.empty()){
+		if(!cli->reply_to.empty()){
+			cout << "reply\n";
+			props._flags = 	AMQP_BASIC_REPLY_TO_FLAG |
+							AMQP_BASIC_CORRELATION_ID_FLAG;
+			props.reply_to = amqp_cstring_bytes(cli->reply_to.c_str());
+		}
+		else
+		{
+			cout << "corr_id\n";
+			props._flags = 	AMQP_BASIC_CONTENT_TYPE_FLAG |
+							AMQP_BASIC_DELIVERY_MODE_FLAG |
+							AMQP_BASIC_CORRELATION_ID_FLAG;
+			props.content_type = amqp_cstring_bytes("text/plain");
+			props.delivery_mode = cli->delMode; /* persistent delivery mode */
+		}
 		props.correlation_id = amqp_cstring_bytes(cli->corr_id.c_str());
-		props.reply_to = amqp_bytes_malloc_dup(amqp_cstring_bytes(cli->reply_to.c_str()));
 		cout << cli->reply_to << ' ' << cli->corr_id << endl;
 
 		amqp_bytes_t data;
 		data.len = cli->payload.length();
 		data.bytes = (void*)cli->payload.data();
-		// const char* b = cli->payload;
-		// if(cli->exchange_name.compare("clock") == 0){
-		// 	cout << cli->exchange_name << ' ' << cli->payload.data() << endl;
-		// }
 
 		die_on_error(amqp_basic_publish(cli->conn,
 										1,
@@ -101,35 +97,32 @@ void amqp_publish(Client *cli)
 										&props,
 										data),
 					"Publishing");
-		cli->reply_to.clear();
-		cli->corr_id.clear();
-		cli->rk2.clear();
-		cli->exchange2.clear();
-
-		amqp_bytes_free(props.reply_to);
+		if(!cli->reply_to.empty()){
+			cli->reply_to.clear();
+			amqp_bytes_free(props.reply_to);
+		}
+		if(!cli->corr_id.empty())
+			cli->corr_id.clear();
+		if(!cli->rk2.empty())
+			cli->rk2.clear();
+		if(!cli->exchange2.empty())
+			cli->exchange2.clear();
+		
 	}
 	else{
-
-		// size_t serial_size = cli->payload.length();
-		// boost::shared_array<uint8_t> buffer(new uint8_t[serial_size]);
-		
-		// ser::OStream stream(buffer.get(), serial_size);
-		// ser::serialize(stream, msg);
-		
-		// std::string s(buffer.get(), buffer.get()+serial_size);
-
-		// std::vector<uint8_t> myVector(cli->payload.begin(), cli->payload.end());
-		// uint8_t *p = &myVector[0];
-
+		if(cli->exchange_name.compare("order") == 0)
+		{
+			cout << "AQUIIIIIIIIIIIIII" << endl;
+		}
 		props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_DELIVERY_MODE_FLAG;
+		props.content_type = amqp_cstring_bytes("text/plain");
+		props.delivery_mode = cli->delMode; /* persistent delivery mode */
 		amqp_bytes_t data;
 		data.len = cli->payload.length();
 		data.bytes = (void*)cli->payload.data();
-		// const char* b = cli->payload;
-		// if(cli->exchange_name.compare("clock") == 0){
-		// 	cout << cli->exchange_name << ' ' << cli->payload.data() << endl;
-		// }
 
+		if(cli->queue_name.empty())
+			cli->queue_name = cli->rk2;
 		die_on_error(amqp_basic_publish(cli->conn,
 										1,
 										amqp_cstring_bytes(cli->exchange_name.c_str()),
@@ -263,6 +256,44 @@ char* hex_to_char(const std::string& input)
     return output;
 }
 
+void getRoutingKey(Client* cli, string temp)
+{
+	size_t getRk;
+	getRk = temp.find("003c0028");
+	if(getRk != string::npos)
+	{
+		int sizeTemp = getRk + 14;
+
+		int size;
+		std::stringstream ss;
+		string sizeVal (temp, sizeTemp-2, 2);
+		ss << std::hex << sizeVal;
+		ss >> size;
+		size *= 2;
+
+		string ex (temp, sizeTemp, size);
+		cli->exchange2 = hex_to_string(ex);
+
+		sizeTemp += size+2;
+
+		int size2;
+		std::stringstream ss2;
+		string sizeVal2 (temp, sizeTemp-2, 2);
+		ss2 << std::hex << sizeVal2;
+		ss2 >> size2;
+		size2 *= 2;
+
+		string rk (temp, sizeTemp, size2);
+		cli->rk2 = hex_to_string(rk);
+		// if(VERBOSE){
+			cout << "rk2: " << cli->rk2 << endl;
+			cout << "exchange2: " << cli->exchange2 << endl;
+			cout << "corr_id: " << cli->corr_id << endl;
+			cout << "reply_to: " << cli->reply_to << endl;
+		// }
+	}
+}
+
 int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 {
 	int operations = -1;
@@ -354,12 +385,18 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 				size *= 2;
 
 				string q (temp, sizeTemp, size);
-				string queue_name = hex_to_string(q);
+				if(!q.empty())
+				{
+					// operations = -1;
+					string queue_name = hex_to_string(q);
 
-				if(!TEST)
-					cli->queue_name = queue_name;
-				if(VERBOSE)
-					cout << queue_name << endl;
+					if(!TEST)
+						cli->queue_name = queue_name;
+					if(VERBOSE)
+						cout << queue_name << endl;
+				}
+				else
+					operations = -1;
 				
 			}
 			else{
@@ -399,6 +436,7 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 
 					if(VERBOSE)
 						cout << exchange_name << ' ' << exchange_name.length() << endl;
+					cout << queue_name << ' ' << exchange_name << endl;
 					
 					sizeTemp += size+2;
 
@@ -417,8 +455,10 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 
 					if(!TEST){
 						cli->bQueue_name = queue_name;
-						if(cli->queue_name.empty())
+						if(cli->queue_name.empty()){
 							cli->queue_name = queue_name;
+							amqp_declare_queue(cli);
+						}
 						cli->bExchange_name = exchange_name;
 						cli->routing_key = routing_key;
 					}
@@ -436,20 +476,73 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 
 						int sizeTemp = found + 6;
 						// cout << temp << endl;
-						if(found >= 4){
-							string delMode (temp, found-4, 2);
-							int mode;
-							std::stringstream ssMode;
-							ssMode << std::hex << delMode;
-							ssMode >> mode;
+						if(found >= 4)
+						{
+							cli->delMode = 2;
 
-							cli->delMode = mode;
+							size_t rk = temp.find("02000100");
+							if(rk != string::npos)
+							{
+								rk+=38;
+								string findIdSize(temp, rk, 4);
+								if(findIdSize.compare("9400") == 0)
+								{
+									rk += 28;
+
+									string coorIdSize(temp, rk, 2);
+									int corr_id_size;
+									std::stringstream ssCorrid;
+									ssCorrid << std::hex << coorIdSize;
+									ssCorrid >> corr_id_size;
+
+									rk += 2;
+									string corr_id (temp, rk, corr_id_size*2);
+									cli->corr_id = hex_to_string(corr_id);
+
+									getRoutingKey(cli, temp);
+									// size_t getRk;
+									// getRk = temp.find("003c0028");
+									// if(getRk != string::npos)
+									// {
+									// 	int sizeTemp = getRk + 14;
+
+									// 	int size;
+									// 	std::stringstream ss;
+									// 	string sizeVal (temp, sizeTemp-2, 2);
+									// 	ss << std::hex << sizeVal;
+									// 	ss >> size;
+									// 	size *= 2;
+
+									// 	string ex (temp, sizeTemp, size);
+									// 	cli->exchange2 = hex_to_string(ex);
+
+									// 	sizeTemp += size+2;
+
+									// 	int size2;
+									// 	std::stringstream ss2;
+									// 	string sizeVal2 (temp, sizeTemp-2, 2);
+									// 	ss2 << std::hex << sizeVal2;
+									// 	ss2 >> size2;
+									// 	size2 *= 2;
+
+									// 	string rk (temp, sizeTemp, size2);
+									// 	cli->rk2 = hex_to_string(rk);
+									// 	// if(VERBOSE){
+									// 		cout << "rk2: " << cli->rk2 << endl;
+									// 		cout << "exchange2: " << cli->exchange2 << endl;
+									// 		cout << "corr_id: " << cli->corr_id << endl;
+									// 		cout << "reply_to: " << cli->reply_to << endl;
+									// 	// }
+									// }
+								}
+
+							}
+
+							
 						}
 						else
 							cli->delMode = 2;
 
-						
-						// cout << temp;
 						string payload_size (temp, sizeTemp, 8);
 
 						int size;
@@ -458,16 +551,19 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 						ss >> size;
 						size *= 2;
 
+						if(cli->exchange_name.compare("order")==0)
+							cout << size << endl;
 						sizeTemp += 8;
-
 						string data (temp, sizeTemp, size);
+
 						// string payload_data = hex_to_string(data);
 						cli->payload = hex_to_string(data);
 						// cout << payload_data;
 
 
 						
-
+						if(cli->queue_name.empty())
+							getRoutingKey(cli, temp);
 						// cout << p << endl;
 
 						if(!TEST)
@@ -587,11 +683,8 @@ bool count_packets(PDU &temp) {
 	    		{
 	    			case 0:
 		    			cli = new Client();
-		    			cout << "getting ip\n";
 		    			cli->setId(tcp.sport());
-		    			cout << "getting ip\n";
 		    			cli->conn = amqp_new_connection();
-		    			cout << "getting ip\n";
 		    			if(ip.dst_addr().to_string().compare("10.10.0.3") == 0)
 		    				cli->ipAddress = "10.10.0.4";
 		    			else
