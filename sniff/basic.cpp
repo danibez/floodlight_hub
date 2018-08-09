@@ -110,10 +110,6 @@ void amqp_publish(Client *cli)
 		
 	}
 	else{
-		if(cli->exchange_name.compare("order") == 0)
-		{
-			cout << "AQUIIIIIIIIIIIIII" << endl;
-		}
 		props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_DELIVERY_MODE_FLAG;
 		props.content_type = amqp_cstring_bytes("text/plain");
 		props.delivery_mode = cli->delMode; /* persistent delivery mode */
@@ -670,7 +666,7 @@ bool count_packets(PDU &temp) {
 	// cout << "Src address: " << ip.src_addr() << endl;
 	string clientIp = ip.src_addr().to_string();
 	counts++;
-	if((clientIp == "10.10.0.1") || (clientIp == "10.10.0.2")){
+	if(clientIp == "10.10.0.6"){// || (clientIp == "10.10.0.2")){
 		const TCP &tcp= temp.rfind_pdu<TCP>();
 		if(tcp.dport() == 5672){
 			const RawPDU &raw = temp.rfind_pdu<RawPDU>();
