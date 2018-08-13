@@ -110,6 +110,7 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 	private String ipSrc;
 
 	private Set<OFPort> hostPorts;
+	private boolean robin = true;
 
 	private int masterPort;
 
@@ -642,9 +643,14 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 		        		if((ipSrc.compareTo("10.10.0.1") == 0) || (ipSrc.compareTo("10.10.0.2") == 0)) {
 			        		Set<OFPort> hostPorts = new HashSet<OFPort>();
 			        		int temp = tcp.getSourcePort().getPort();
-			        		result = (temp % 3)+2;
-			        		if(result == 2)
+			        		if(robin) {
+			        			result = 3;
+			        			robin = false;
+			        		}
+			        		else {
 			        			result = 4;
+			        			robin = true;
+			        		}
 			        		int p = getPortFromIp(ipSrc);
 			        		OFPort[] tempVet = flowMap.get(temp);
 			        		OFPort port;
