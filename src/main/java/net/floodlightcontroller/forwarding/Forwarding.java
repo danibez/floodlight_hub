@@ -648,7 +648,7 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 			        			robin = false;
 			        		}
 			        		else {
-			        			result = 4;
+			        			result = 3;
 			        			robin = true;
 			        		}
 			        		int p = getPortFromIp(ipSrc);
@@ -660,7 +660,7 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 			        			tempVet = new OFPort[2];
 			        			tempVet[0] = port;
 			        			tempVet[1] = OFPort.of(result);
-			        			hostPorts.add(tempVet[1]);
+//			        			hostPorts.add(tempVet[1]);
 			        			flowMap.put(temp, tempVet);
 			        			log.info("New Connection");
 			        			log.info("p: {}, result: {}", p, result);
@@ -670,10 +670,11 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 			        			if(!tempVet[0].equals(OFPort.of(p)))
 			        				log.info("\n\nDEU RUIM!!!\n\n\n");
 //			        			log.info("From Hosts => port {} at {}", temp, tempVet[0]);
-			        			hostPorts.add(tempVet[1]);
+//			        			hostPorts.add(tempVet[1]);
 			        			port = tempVet[0];
 			        		}
-		        			packetOutMultiPort(pi, sw, port, flowMap, hostPorts, cntx);
+			        		hostPorts.add(OFPort.of(result));
+		        			packetOutMultiPort(pi, sw, OFPort.of(1), flowMap, hostPorts, cntx);
 		        		}
 		        		else
 		        			doL2ForwardFlow(sw, pi, decision, cntx, false);
@@ -683,8 +684,7 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 		        		String ipDst = ipv4.getDestinationAddress().toString();
 		        		if ((	(ipSrc.compareTo("10.10.0.3") == 0)  ||
 		        				(ipSrc.compareTo("10.10.0.4") == 0)  ||
-		        				(ipSrc.compareTo("10.10.0.5") == 0)) &&
-		        				(ipDst.compareTo("10.10.0.6") == 0)) {
+		        				(ipSrc.compareTo("10.10.0.5") == 0))) {
 		        			Set<OFPort> hostPorts = new HashSet<OFPort>();
 
 		        			boolean op = setMaster(hostPorts, ipSrc);        			
@@ -693,9 +693,14 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 	        				int pout = getPortFromIp(ipDst);
 	        				
 	        				int temp = tcp.getDestinationPort().getPort();
-	        				result = (temp % 3)+2;
-			        		if(result == 2)
-			        			result = 4;
+	        				if(robin) {
+			        			result = 3;
+			        			robin = false;
+			        		}
+			        		else {
+			        			result = 3;
+			        			robin = true;
+			        		}
 			        		int p = getPortFromIp(ipSrc);
 			        		OFPort port;
 	        				OFPort[] tempVet = flowMap.get(temp);
@@ -705,7 +710,7 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 			        			tempVet = new OFPort[2];
 			        			tempVet[1] = port;
 			        			tempVet[0] = OFPort.of(result);
-			        			hostPorts.add(tempVet[0]);
+//			        			hostPorts.add(tempVet[0]);
 			        			flowMap.put(temp, tempVet);
 			        			log.info("New Connection");
 			        			log.info("p: {}, result: {}", p, result);
@@ -713,15 +718,16 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 	        				else {
 	        					if(!tempVet[1].equals(OFPort.of(p)))
 			        				log.info("\n\nDEU RUIM!!!\n\n\n");
-	        					hostPorts.add(tempVet[0]);
+//	        					hostPorts.add(tempVet[0]);
 			        			port = tempVet[1];
 	        				}
 		        			
 	        				Set<OFPort> outPort = new HashSet<OFPort>();
 	        				outPort.add(tempVet[0]);
-//	        				log.info("From Broker => port {} at {}", temp, tempVet[0]);
+	        				hostPorts.add(OFPort.of(1));
+	        				log.info("From Broker => port {} at {}", temp, tempVet[0]);
 	        				
-	        				packetOutMultiPort(pi, sw, port, flowMap, outPort, cntx);
+	        				packetOutMultiPort(pi, sw, OFPort.of(3), flowMap, hostPorts, cntx);
 		        		}
 		        		else
 		            		doL2ForwardFlow(sw, pi, decision, cntx, false);
@@ -732,7 +738,18 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
         		else
             		doL2ForwardFlow(sw, pi, decision, cntx, false);
         	}
-        	else
+        	else if(pkt instanceof ARP){
+        		log.info("ARP PACKET");
+//        		Optional<VirtualGatewayInstance> instance = getGatewayInstance(sw.getId());
+//        		VirtualGatewayInstance gatewayInstance = instance.get();
+        		if (eth.getEtherType() == EthType.ARP && ((ARP) eth.getPayload()).getOpCode().equals(ARP.OP_REQUEST)) {
+//        			MacAddress gatewayMac = gatewayInstance.getGatewayMac();
+            		OFPort inPort = OFMessageUtils.getInPort(pi);
+                    IPacket arpReply = gatewayArpReply(cntx, MacAddress.of("12:34:56:78:90:12"));
+                    pushArpReply(arpReply, sw, OFBufferId.NO_BUFFER, OFPort.ANY, inPort);
+                    log.debug("Virtual gateway pushing ARP reply message to source host");
+                }
+        	}else        	
         		doL2ForwardFlow(sw, pi, decision, cntx, false);
         }
     }
