@@ -67,14 +67,14 @@ void amqp_publish(Client *cli)
 
 	if(!cli->corr_id.empty()){
 		if(!cli->reply_to.empty()){
-			cout << "reply\n";
+			// cout << "reply\n";
 			props._flags = 	AMQP_BASIC_REPLY_TO_FLAG |
 							AMQP_BASIC_CORRELATION_ID_FLAG;
 			props.reply_to = amqp_cstring_bytes(cli->reply_to.c_str());
 		}
 		else
 		{
-			cout << "corr_id\n";
+			// cout << "corr_id\n";
 			props._flags = 	AMQP_BASIC_CONTENT_TYPE_FLAG |
 							AMQP_BASIC_DELIVERY_MODE_FLAG |
 							AMQP_BASIC_CORRELATION_ID_FLAG;
@@ -82,7 +82,7 @@ void amqp_publish(Client *cli)
 			props.delivery_mode = cli->delMode; /* persistent delivery mode */
 		}
 		props.correlation_id = amqp_cstring_bytes(cli->corr_id.c_str());
-		cout << cli->reply_to << ' ' << cli->corr_id << endl;
+		// cout << cli->reply_to << ' ' << cli->corr_id << endl;
 
 		amqp_bytes_t data;
 		data.len = cli->payload.length();
@@ -281,12 +281,12 @@ void getRoutingKey(Client* cli, string temp)
 
 		string rk (temp, sizeTemp, size2);
 		cli->rk2 = hex_to_string(rk);
-		// if(VERBOSE){
+		if(VERBOSE){
 			cout << "rk2: " << cli->rk2 << endl;
 			cout << "exchange2: " << cli->exchange2 << endl;
 			cout << "corr_id: " << cli->corr_id << endl;
 			cout << "reply_to: " << cli->reply_to << endl;
-		// }
+		}
 	}
 }
 
@@ -430,10 +430,11 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 					string ex (temp, sizeTemp, size);
 					string exchange_name = hex_to_string(ex);
 
-					if(VERBOSE)
+					if(VERBOSE){
 						cout << exchange_name << ' ' << exchange_name.length() << endl;
-					cout << queue_name << ' ' << exchange_name << endl;
-					
+						cout << queue_name << ' ' << exchange_name << endl;
+					}
+
 					sizeTemp += size+2;
 
 					std::stringstream ss3;
@@ -496,40 +497,6 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 									cli->corr_id = hex_to_string(corr_id);
 
 									getRoutingKey(cli, temp);
-									// size_t getRk;
-									// getRk = temp.find("003c0028");
-									// if(getRk != string::npos)
-									// {
-									// 	int sizeTemp = getRk + 14;
-
-									// 	int size;
-									// 	std::stringstream ss;
-									// 	string sizeVal (temp, sizeTemp-2, 2);
-									// 	ss << std::hex << sizeVal;
-									// 	ss >> size;
-									// 	size *= 2;
-
-									// 	string ex (temp, sizeTemp, size);
-									// 	cli->exchange2 = hex_to_string(ex);
-
-									// 	sizeTemp += size+2;
-
-									// 	int size2;
-									// 	std::stringstream ss2;
-									// 	string sizeVal2 (temp, sizeTemp-2, 2);
-									// 	ss2 << std::hex << sizeVal2;
-									// 	ss2 >> size2;
-									// 	size2 *= 2;
-
-									// 	string rk (temp, sizeTemp, size2);
-									// 	cli->rk2 = hex_to_string(rk);
-									// 	// if(VERBOSE){
-									// 		cout << "rk2: " << cli->rk2 << endl;
-									// 		cout << "exchange2: " << cli->exchange2 << endl;
-									// 		cout << "corr_id: " << cli->corr_id << endl;
-									// 		cout << "reply_to: " << cli->reply_to << endl;
-									// 	// }
-									// }
 								}
 
 							}
@@ -547,8 +514,8 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 						ss >> size;
 						size *= 2;
 
-						if(cli->exchange_name.compare("order")==0)
-							cout << size << endl;
+						// if(cli->exchange_name.compare("order")==0)
+							// cout << size << endl;
 						sizeTemp += 8;
 						string data (temp, sizeTemp, size);
 
@@ -561,13 +528,6 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 						if(cli->queue_name.empty())
 							getRoutingKey(cli, temp);
 						// cout << p << endl;
-
-						if(!TEST)
-						{
-							// 	char * copy = malloc(strlen(original) + 1); 
-							// 	strcpy(copy, original);
-							// cli->payload = payload_data;
-						}
 					}
 					else
 					{
@@ -581,8 +541,8 @@ int processAmqpPacket(RawPDU::payload_type payload, Client* cli)
 							string property_flags (temp, sizeTemp, 4);
 							if(property_flags.compare("0600") == 0)
 							{
-								// if(VERBOSE)
-								cout << ">>>>>Publish2\n";
+								if(VERBOSE)
+									cout << ">>>>>Publish2\n";
 								sizeTemp += 4;
 								string corr_id_size (temp, sizeTemp, 2);
 
@@ -685,24 +645,24 @@ bool count_packets(PDU &temp) {
 		    				cli->ipAddress = "10.10.0.4";
 		    			else
 		    				cli->ipAddress = "10.10.0.3";
-		    			cout << cli->ipAddress << endl;
+		    			// cout << cli->ipAddress << endl;
 		    			amqp_connect(cli);
 		    			addClientToMap(tcp.sport(), *cli);
 		    			break;
 		    		case 1:
-		    			cli = getClientFromMap(tcp.sport());
+		    			// cli = getClientFromMap(tcp.sport());
 		    			amqp_declare_exchange(cli);//, bool declare_queue)
 		    			break;
 	    			case 2:
-		    			cli = getClientFromMap(tcp.sport());
+		    			// cli = getClientFromMap(tcp.sport());
 		    			amqp_declare_queue(cli);//, bool declare_queue)
 		    			break;
 		    		case 3:
-		    			cli = getClientFromMap(tcp.sport());
+		    			// cli = getClientFromMap(tcp.sport());
 		    			amqp_bind_queue(cli);//, bool declare_queue)
 		    			break;
 		    		case 4:
-		    			cli = getClientFromMap(tcp.sport());
+		    			// cli = getClientFromMap(tcp.sport());
 		    			amqp_publish(cli);//, bool declare_queue)
 		    			break;
 		    		default:

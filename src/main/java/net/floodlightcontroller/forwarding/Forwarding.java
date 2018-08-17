@@ -640,7 +640,8 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 		        	if((tcp.getDestinationPort().toString().compareTo("5672") == 0) || (tcp.getDestinationPort().toString().compareTo("5001") == 0))
 		        	{
 		        		ipSrc = ipv4.getSourceAddress().toString();
-		        		if((ipSrc.compareTo("10.10.0.1") == 0) || (ipSrc.compareTo("10.10.0.2") == 0)) {
+		        		if((ipSrc.compareTo("10.10.0.1") == 0) || (ipSrc.compareTo("10.10.0.2") == 0)){
+//		        			log.info("sw: {}", sw.getId().toString());
 			        		Set<OFPort> hostPorts = new HashSet<OFPort>();
 			        		int temp = tcp.getSourcePort().getPort();
 			        		if(robin) {
@@ -662,29 +663,37 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 			        			tempVet[1] = OFPort.of(result);
 //			        			hostPorts.add(tempVet[1]);
 			        			flowMap.put(temp, tempVet);
-			        			log.info("New Connection");
-			        			log.info("p: {}, result: {}", p, result);
+//			        			log.info("New Connection");
+//			        			log.info("p: {}, result: {}", p, result);
 			        		}
 			        		else
-			        		{	
+			        		{
 			        			if(!tempVet[0].equals(OFPort.of(p)))
 			        				log.info("\n\nDEU RUIM!!!\n\n\n");
 //			        			log.info("From Hosts => port {} at {}", temp, tempVet[0]);
 //			        			hostPorts.add(tempVet[1]);
 			        			port = tempVet[0];
 			        		}
-			        		hostPorts.add(OFPort.of(result));
-		        			packetOutMultiPort(pi, sw, OFPort.of(1), flowMap, hostPorts, cntx);
+
+//			        		hostPorts.add(OFPort.of(3));
+		        			packetOutMultiPort(pi, sw, port, flowMap, hostPorts, cntx);
 		        		}
-		        		else
+		        		else {
+//		        			log.info("forwarding sw1");
+//		        			Set<OFPort> hostPorts = new HashSet<OFPort>();
+//		        			hostPorts.add(OFPort.of(2));
+//		        			packetOutMultiPort(pi, sw, OFPort.of(1), flowMap, hostPorts, cntx);
 		        			doL2ForwardFlow(sw, pi, decision, cntx, false);
+		        		}
 		        	}
 		        	else if((tcp.getSourcePort().toString().compareTo("5672") == 0) || (tcp.getSourcePort().toString().compareTo("5001") == 0)) {
 		        		ipSrc = ipv4.getSourceAddress().toString();
+//		        		log.info("sw: {}", sw.getId().toString());
 		        		String ipDst = ipv4.getDestinationAddress().toString();
-		        		if ((	(ipSrc.compareTo("10.10.0.3") == 0)  ||
+		        		if (	(ipSrc.compareTo("10.10.0.3") == 0)  ||
 		        				(ipSrc.compareTo("10.10.0.4") == 0)  ||
-		        				(ipSrc.compareTo("10.10.0.5") == 0))) {
+		        				(ipSrc.compareTo("10.10.0.5") == 0)) {
+
 		        			Set<OFPort> hostPorts = new HashSet<OFPort>();
 
 		        			boolean op = setMaster(hostPorts, ipSrc);        			
@@ -693,16 +702,16 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 	        				int pout = getPortFromIp(ipDst);
 	        				
 	        				int temp = tcp.getDestinationPort().getPort();
-	        				if(robin) {
-			        			result = 3;
-			        			robin = false;
-			        		}
-			        		else {
-			        			result = 3;
-			        			robin = true;
-			        		}
+//	        				if(robin) {
+//			        			result = 3;
+//			        			robin = false;
+//			        		}
+//			        		else {
+//			        			result = 4;
+//			        			robin = true;
+//			        		}
 			        		int p = getPortFromIp(ipSrc);
-			        		OFPort port;
+			        		OFPort port = OFPort.of(p);
 	        				OFPort[] tempVet = flowMap.get(temp);
 	        				if(tempVet == null)
 			        		{
@@ -721,16 +730,17 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 //	        					hostPorts.add(tempVet[0]);
 			        			port = tempVet[1];
 	        				}
-		        			
-	        				Set<OFPort> outPort = new HashSet<OFPort>();
-	        				outPort.add(tempVet[0]);
-	        				hostPorts.add(OFPort.of(1));
-	        				log.info("From Broker => port {} at {}", temp, tempVet[0]);
+
+//	        				Set<OFPort> outPort = new HashSet<OFPort>();
+//	        				outPort.add(OFPort.of(1));
+//	        				log.info("From Broker => port {} at {}", temp, tempVet[0]);
 	        				
-	        				packetOutMultiPort(pi, sw, OFPort.of(3), flowMap, hostPorts, cntx);
+	        				packetOutMultiPort(pi, sw, port, flowMap, hostPorts, cntx);
 		        		}
-		        		else
+		        		else {
+//		        			log.info("forwarding sw1");
 		            		doL2ForwardFlow(sw, pi, decision, cntx, false);
+		        		}
 		        	}
 		        	else
 	            		doL2ForwardFlow(sw, pi, decision, cntx, false);
