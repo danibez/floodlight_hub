@@ -357,6 +357,7 @@ public abstract class ForwardingBase implements IOFMessageListener {
         	if(inPort.getPortNumber() < 3) {
         		if(port.getPortNumber() <= 2) continue;
 //        		==================10.10.0.6:5003/4/5<--->10.10.0.3/.4/.5:5001===================
+//        		log.info("front: {}",port.getPortNumber());
         		OFActionSetField setNwDst = action.buildSetField()
     			        .setField(
     			            oxms.buildIpv4Dst()
@@ -407,7 +408,7 @@ public abstract class ForwardingBase implements IOFMessageListener {
             	actions.add(setDlSrc);
             	actions.add(setNwSrc);
 //            	actions.add(setTcpSrc);
-                actions.add(sw.getOFFactory().actions().output(port, 0));
+                actions.add(sw.getOFFactory().actions().output(OFPort.of(3), 0));
         	}
         	else{
 //        		==================10.10.0.6:5001<--->10.10.0.1:X===================
@@ -423,11 +424,11 @@ public abstract class ForwardingBase implements IOFMessageListener {
 //        			actions.add(sw.getOFFactory().actions().output(port, 0));
 //        			break;
 //        		}
-//        		log.info("{}",port.getPortNumber());
+//        		log.info("back: {}",port.getPortNumber());
 	        	OFActionSetField setNwDst = action.buildSetField()
 				        .setField(
 				            oxms.buildIpv4Dst()
-				            .setValue(IPv4Address.of("10.10.0."+port.getPortNumber()))
+				            .setValue(IPv4Address.of("10.10.0."+(port.getPortNumber())))
 				            .build()
 				          //+inPort.getPortNumber()))
 				        )
@@ -435,7 +436,7 @@ public abstract class ForwardingBase implements IOFMessageListener {
 	        	OFActionSetField setDlDst = action.buildSetField()
 	        		    .setField(
 	        		        oxms.buildEthDst()
-	        		        .setValue(MacAddress.of("00:00:00:00:00:0"+port.getPortNumber()))//12:34:56:78:90:12
+	        		        .setValue(MacAddress.of("00:00:00:00:00:0"+(port.getPortNumber())))//12:34:56:78:90:12
 	        		        .build()
 	        		      //+inPort.getPortNumber()))
 	        		    )
@@ -469,7 +470,7 @@ public abstract class ForwardingBase implements IOFMessageListener {
             	actions.add(setDlSrc);
             	actions.add(setNwSrc);
 //            	actions.add(setTcpDst);
-	            actions.add(sw.getOFFactory().actions().output(OFPort.of(port.getPortNumber()), 0));
+	            actions.add(sw.getOFFactory().actions().output(port, 0));
 	            break;
         	}
         }
