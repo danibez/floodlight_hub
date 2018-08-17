@@ -168,7 +168,7 @@ void amqp_declare_queue(Client* cli)
 {
 	const char* q = cli->queue_name.c_str();
 	amqp_bytes_t queuename = amqp_cstring_bytes(q);
-	amqp_queue_declare_ok_t *r = amqp_queue_declare(cli->conn, 1, queuename, 0, 0, 0, 0,
+	amqp_queue_declare_ok_t *r = amqp_queue_declare(cli->conn, 1, queuename, 0, 0, 0, 1,
 	                             amqp_empty_table);
 	die_on_amqp_error(amqp_get_rpc_reply(cli->conn), "Declaring queue");
 	queuename = amqp_bytes_malloc_dup(r->queue);
